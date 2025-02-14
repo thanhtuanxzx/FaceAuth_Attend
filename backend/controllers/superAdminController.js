@@ -29,10 +29,37 @@ export const createAdmin = async (req, res) => {
 export const deleteAdmin = async (req, res) => {
     try {
         const { adminId } = req.params;
+
+        // 🔍 Kiểm tra admin có tồn tại không trước khi xóa
+        const admin = await User.findById(adminId);
+        if (!admin) {
+            return res.status(404).json({ message: "Admin không tồn tại!" });
+        }
+
+        // 🗑️ Xóa admin
         await User.findByIdAndDelete(adminId);
-        res.json({ message: "Admin đã bị xóa" });
+
+        // ✅ Lưu log xóa admin
+        await Log.create({
+            user_id: req.user.id, // Người thực hiện hành động
+            action: "Xóa Admin",
+            description: `Super Admin ${req.user.id} đã xóa Admin ${adminId} (${admin.name})`,
+            timestamp: new Date(),
+        });
+
+        res.json({ message: `Admin ${admin.name} đã bị xóa` });
     } catch (error) {
-        res.status(500).json({ message: "Lỗi xóa Admin", error });
+        console.error("❌ Lỗi xóa Admin:", error);
+
+        // ❌ Lưu log lỗi
+        await Log.create({
+            user_id: req.user ? req.user.id : null,
+            action: "Lỗi",
+            description: `Lỗi khi xóa Admin: ${error.message}`,
+            timestamp: new Date(),
+        });
+
+        res.status(500).json({ message: "Lỗi xóa Admin", error: error.message });
     }
 };
 
@@ -68,10 +95,37 @@ export const createStudent = async (req, res) => {
 export const deleteStudent = async (req, res) => {
     try {
         const { studentId } = req.params;
+
+        // 🔍 Kiểm tra sinh viên có tồn tại không trước khi xóa
+        const student = await User.findById(studentId);
+        if (!student) {
+            return res.status(404).json({ message: "Sinh viên không tồn tại!" });
+        }
+
+        // 🗑️ Xóa sinh viên
         await User.findByIdAndDelete(studentId);
-        res.json({ message: "Sinh viên đã bị xóa" });
+
+        // ✅ Lưu log xóa sinh viên
+        await Log.create({
+            user_id: req.user.id, // Người thực hiện hành động
+            action: "Xóa sinh viên",
+            description: `Admin ${req.user.id} đã xóa sinh viên ${studentId} (${student.name})`,
+            timestamp: new Date(),
+        });
+
+        res.json({ message: `Sinh viên ${student.name} đã bị xóa` });
     } catch (error) {
-        res.status(500).json({ message: "Lỗi xóa sinh viên", error });
+        console.error("❌ Lỗi xóa sinh viên:", error);
+
+        // ❌ Lưu log lỗi
+        await Log.create({
+            user_id: req.user ? req.user.id : null,
+            action: "Lỗi",
+            description: `Lỗi khi xóa sinh viên: ${error.message}`,
+            timestamp: new Date(),
+        });
+
+        res.status(500).json({ message: "Lỗi xóa sinh viên", error: error.message });
     }
 };
 
