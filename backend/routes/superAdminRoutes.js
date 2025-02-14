@@ -20,7 +20,7 @@ router.delete("/student/:studentId", authenticateUser, authorizeRoles("super_adm
 router.get("/students",authenticateUser, authorizeRoles("super_admin"), getAllStudents);
 
 // Quản lý Hoạt động
-router.post("/activity", authenticateUser, authorizeRoles("super_admin","admin"),createActivity);
+router.post("/activity", authenticateUser, authorizeRoles("super_admin","admin","student"),createActivity);
 router.delete("/activity/:activityId",  authenticateUser, authorizeRoles("super_admin","admin"),deleteActivity);
 // router.get("/activities",  authenticateUser, authorizeRoles("super_admin","admin"),getAllActivities);
 router.get("/activities",  getAllActivities);

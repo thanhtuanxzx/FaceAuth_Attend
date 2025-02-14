@@ -83,32 +83,77 @@ export const getAllStudents = async (req, res) => {
 };
 
 // ✅ 5️⃣ Quản lý hoạt động (Tạo, Cập nhật, Xóa)
+// export const createActivity = async (req, res) => {
+//     try {
+//         // console.log("📥 Dữ liệu nhận được:", req.body);
+//         // console.log("👤 Người tạo:", req.user); // Kiểm tra thông tin người tạo
+
+//         const { name, description, date } = req.body;
+
+//         // Kiểm tra nếu không có req.user.id
+//         if (!req.user || !req.user.id) {
+//             return res.status(403).json({ message: "Bạn không có quyền tạo hoạt động!" });
+//         }
+
+//         const newActivity = await Activity.create({
+//             name,
+//             description,
+//             date,
+//             created_by: req.user.id, // Super Admin tạo
+//         });
+
+//         // console.log("✅ Hoạt động đã tạo:", newActivity);
+//         res.status(201).json({ message: "Hoạt động đã được tạo", activity: newActivity });
+//     } catch (error) {
+//         console.error("❌ Lỗi tạo hoạt động:", error);
+//         res.status(500).json({ message: "Lỗi tạo hoạt động", error: error.message });
+//     }
+// };
 export const createActivity = async (req, res) => {
     try {
-        // console.log("📥 Dữ liệu nhận được:", req.body);
-        // console.log("👤 Người tạo:", req.user); // Kiểm tra thông tin người tạo
+        const { name, description, date, locations } = req.body;
 
-        const { name, description, date } = req.body;
-
-        // Kiểm tra nếu không có req.user.id
+        // Kiểm tra quyền tạo hoạt động
         if (!req.user || !req.user.id) {
             return res.status(403).json({ message: "Bạn không có quyền tạo hoạt động!" });
         }
 
+        // Kiểm tra danh sách địa điểm
+        if (!Array.isArray(locations) || locations.length === 0) {
+            return res.status(400).json({ message: "Hoạt động cần có ít nhất một địa điểm!" });
+        }
+
+        // Kiểm tra từng địa điểm có lat, lon, radius không
+        for (const location of locations) {
+            if (!location.lat || !location.lon || !location.radius) {
+                return res.status(400).json({ message: "Mỗi địa điểm phải có lat, lon và radius!" });
+            }
+        }
+
+        // Tạo hoạt động với danh sách địa điểm
         const newActivity = await Activity.create({
             name,
             description,
             date,
-            created_by: req.user.id, // Super Admin tạo
+            locations: locations.map(loc => ({
+                lat: loc.lat,
+                lon: loc.lon,
+                radius: loc.radius
+            })), // Đảm bảo lưu đúng định dạng
+            created_by: req.user.id,
         });
 
-        // console.log("✅ Hoạt động đã tạo:", newActivity);
-        res.status(201).json({ message: "Hoạt động đã được tạo", activity: newActivity });
+        res.status(201).json({
+            message: "Hoạt động đã được tạo",
+            activity: newActivity
+        });
     } catch (error) {
         console.error("❌ Lỗi tạo hoạt động:", error);
         res.status(500).json({ message: "Lỗi tạo hoạt động", error: error.message });
     }
 };
+
+
 
 
 export const deleteActivity = async (req, res) => {
