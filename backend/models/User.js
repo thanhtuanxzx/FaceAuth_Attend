@@ -6,6 +6,9 @@ const UserSchema = new mongoose.Schema({
     password: { type: String, required: true },
     isVerified: { type: Boolean, default: false } ,
     role: { type: String, enum: ["super_admin", "admin", "student"], required: true },
+    studentId: { type: String, unique: true, sparse: true }, // Mã số sinh viên
+    classCode: { type: String }, // Mã lớp
+    major: { type: String }, // Ngành học
     created_at: { type: Date, default: Date.now }
 });
 

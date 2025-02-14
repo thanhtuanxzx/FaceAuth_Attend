@@ -5,6 +5,7 @@ import authRoutes from './routes/auth.js';
 import faceRoutes from './routes/faceRoutes.js';
 import superAdminRoutes from "./routes/superAdminRoutes.js";
 import studentRoutes from "./routes/studentRoutes.js";
+import statisticsRoutes from "./routes/statisticsRoutes.js";
 
 const app = express();
 
@@ -18,6 +19,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/face', faceRoutes);
 app.use("/api/superadmin", superAdminRoutes);
 app.use("/api/students", studentRoutes);
+app.use("/api/statistics", statisticsRoutes);
 
 const PORT = process.env.PORT || 8000;
 app.listen(PORT, () => {

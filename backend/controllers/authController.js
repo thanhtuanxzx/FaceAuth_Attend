@@ -11,7 +11,7 @@ dotenv.config();
 // 📝 Đăng ký tài khoản
 export const register = async (req, res) => {
     try {
-        const { name, email, password, role = "student" } = req.body;
+        const { name, email, password, studentId, classCode, major, role = "student" } = req.body;
 
         // Nếu role khác "student", từ chối đăng ký
         if (role !== "student") {
@@ -22,11 +22,24 @@ export const register = async (req, res) => {
         let user = await User.findOne({ email });
         if (user) return res.status(400).json({ message: "Email đã tồn tại!" });
 
+        // Kiểm tra xem mã số sinh viên đã tồn tại chưa
+        let existingStudent = await User.findOne({ studentId });
+        if (existingStudent) return res.status(400).json({ message: "Mã số sinh viên đã tồn tại!" });
+
         // Mã hóa mật khẩu
         const hashedPassword = await bcrypt.hash(password, 10);
 
         // Tạo user mới nhưng chưa xác thực
-        user = new User({ name, email, password: hashedPassword, role, isVerified: false });
+        user = new User({ 
+            name, 
+            email, 
+            password: hashedPassword, 
+            studentId, 
+            classCode, 
+            major, 
+            role, 
+            isVerified: false 
+        });
         await user.save();
 
         // Tạo token xác thực email
@@ -42,6 +55,7 @@ export const register = async (req, res) => {
         res.status(500).json({ message: "Lỗi đăng ký", error });
     }
 };
+
 
 
 // 📝 Xác thực tài khoản qua email
