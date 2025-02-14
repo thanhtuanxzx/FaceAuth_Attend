@@ -509,7 +509,7 @@ export const exportPDFConfirmation = async (req, res) => {
             setTimeout(() => {
                 fs.unlinkSync(outputPath);
                 console.log(`🗑️ File đã bị xóa: ${outputPath}`);
-            }, 6000);
+            }, 60000);
         });
 
     } catch (error) {
