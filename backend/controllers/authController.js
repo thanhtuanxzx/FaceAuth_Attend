@@ -4,7 +4,7 @@ import User from '../models/User.js';
 import sendEmail from "../utils/sendEmail.js";
 import dotenv from "dotenv";
 import nodemailer from 'nodemailer';
-
+import Log from "../models/Log.js";
 
 dotenv.config();
 
@@ -69,18 +69,61 @@ export const login = async (req, res) => {
         const { email, password } = req.body;
         const user = await User.findOne({ email });
 
-        if (!user) return res.status(400).json({ message: 'Email không tồn tại' });
+        if (!user) {
+            await Log.create({
+                user_id: null, // Không có user_id vì email không tồn tại
+                action: "Đăng nhập thất bại",
+                description: `Đăng nhập thất bại: Email ${email} không tồn tại`,
+                timestamp: new Date(),
+            });
+            return res.status(400).json({ message: 'Email không tồn tại' });
+        }
 
         // Kiểm tra tài khoản đã xác thực hay chưa
-        if (!user.isVerified) return res.status(403).json({ message: 'Tài khoản chưa được xác thực. Vui lòng kiểm tra email!' });
+        if (!user.isVerified) {
+            await Log.create({
+                user_id: user._id,
+                action: "Đăng nhập thất bại",
+                description: `Người dùng ${user._id} cố gắng đăng nhập nhưng tài khoản chưa xác thực`,
+                timestamp: new Date(),
+            });
+            return res.status(403).json({ message: 'Tài khoản chưa được xác thực. Vui lòng kiểm tra email!' });
+        }
 
         const validPassword = await bcrypt.compare(password, user.password);
-        if (!validPassword) return res.status(401).json({ message: 'Mật khẩu không đúng' });
+        if (!validPassword) {
+            await Log.create({
+                user_id: user._id,
+                action: "Đăng nhập thất bại",
+                description: `Người dùng ${user._id} nhập sai mật khẩu`,
+                timestamp: new Date(),
+            });
+            return res.status(401).json({ message: 'Mật khẩu không đúng' });
+        }
 
-        const token = jwt.sign({ id: user._id, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        const token = jwt.sign(
+            { id: user._id, email: user.email, role: user.role },
+            process.env.JWT_SECRET,
+            { expiresIn: '1h' }
+        );
+
+        // ✅ Lưu log đăng nhập thành công
+        await Log.create({
+            user_id: user._id,
+            action: "Đăng nhập thành công",
+            description: `Người dùng ${user._id} đã đăng nhập thành công`,
+            timestamp: new Date(),
+        });
 
         res.json({ token, message: 'Đăng nhập thành công' });
     } catch (error) {
+        await Log.create({
+            user_id: null,
+            action: "Lỗi hệ thống",
+            description: `Lỗi đăng nhập: ${error.message}`,
+            timestamp: new Date(),
+        });
+
         res.status(500).json({ message: 'Lỗi đăng nhập', error });
     }
 };

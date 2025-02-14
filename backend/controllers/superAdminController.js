@@ -3,6 +3,8 @@ import Activity from "../models/Activity.js";
 import AttendanceRecord from "../models/AttendanceRecord.js";
 import Log from "../models/Log.js";
 import bcrypt from "bcrypt";
+import mongoose from "mongoose";
+
 
 // ✅ 1️⃣ Tạo tài khoản Admin
 export const createAdmin = async (req, res) => {
@@ -143,12 +145,31 @@ export const createActivity = async (req, res) => {
             created_by: req.user.id,
         });
 
+         // ✅ Lưu log tạo hoạt động
+         await Log.create({
+            user_id: req.user.id,
+            action: "Tạo hoạt động",
+            description: `Người dùng ${req.user.id} đã tạo hoạt động ${newActivity._id} (${name})`,
+            timestamp: new Date(),
+        });
+
+
         res.status(201).json({
             message: "Hoạt động đã được tạo",
             activity: newActivity
         });
     } catch (error) {
         console.error("❌ Lỗi tạo hoạt động:", error);
+
+         // ❌ Lưu log lỗi
+         await Log.create({
+            user_id: req.user ? req.user.id : null,
+            action: "Lỗi",
+            description: `Lỗi khi tạo hoạt động: ${error.message}`,
+            timestamp: new Date(),
+        });
+
+
         res.status(500).json({ message: "Lỗi tạo hoạt động", error: error.message });
     }
 };
@@ -158,13 +179,45 @@ export const createActivity = async (req, res) => {
 
 export const deleteActivity = async (req, res) => {
     try {
-        const { activityId } = req.params;
+        const activityId = req.params.activityId.trim();
+
+        if (!mongoose.Types.ObjectId.isValid(activityId)) {
+            return res.status(400).json({ message: "ID hoạt động không hợp lệ!" });
+        }
+
+        // 🔍 Tìm hoạt động trước khi xóa
+        const activity = await Activity.findById(activityId);
+        if (!activity) {
+            return res.status(404).json({ message: "Hoạt động không tồn tại!" });
+        }
+
+        // 🗑️ Xóa hoạt động
         await Activity.findByIdAndDelete(activityId);
+
+        // ✅ Lưu log xóa hoạt động
+        await Log.create({
+            user_id: req.user.id,
+            action: "Xóa hoạt động",
+            description: `Người dùng ${req.user.id} đã xóa hoạt động ${activityId} (${activity.name})`,
+            timestamp: new Date(),
+        });
+
         res.json({ message: "Hoạt động đã bị xóa" });
     } catch (error) {
-        res.status(500).json({ message: "Lỗi xóa hoạt động", error });
+        console.error("❌ Lỗi xóa hoạt động:", error);
+
+        // ❌ Lưu log lỗi
+        await Log.create({
+            user_id: req.user ? req.user.id : null,
+            action: "Lỗi",
+            description: `Lỗi khi xóa hoạt động: ${error.message}`,
+            timestamp: new Date(),
+        });
+
+        res.status(500).json({ message: "Lỗi xóa hoạt động", error: error.message });
     }
 };
+
 
 export const getAllActivities = async (req, res) => {
     try {
