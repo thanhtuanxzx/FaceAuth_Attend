@@ -40,18 +40,19 @@ import Activity from "../models/Activity.js";
 
 export const markAttendance = async (req, res) => {
     try {
-        const { activity_id, isOnSchoolWiFi, userLocation } = req.body;
-        const student_id = req.user.id;
+        const { isOnSchoolWiFi, userLocation } = req.body;
+        const { id: student_id, activity_id } = req.user;
 
         console.log("📥 Dữ liệu nhận được từ client:", req.body);
         console.log("👤 Student ID:", student_id);
+        console.log("📌 Activity ID từ token:", activity_id);
 
         if (!student_id) {
             return res.status(400).json({ message: "Thiếu student_id từ token!" });
         }
 
         if (!activity_id) {
-            return res.status(400).json({ message: "Thiếu activity_id!" });
+            return res.status(400).json({ message: "Thiếu activity_id từ token!" });
         }
 
         // 📌 Tìm hoạt động
