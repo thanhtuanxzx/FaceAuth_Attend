@@ -4,7 +4,7 @@ import {
     createAdmin, deleteAdmin, getAllAdmins,
     createStudent, deleteStudent, getAllStudents,
     createActivity, deleteActivity, getAllActivities,
-    getAttendanceRecords, getSystemLogs
+    getAttendanceRecords, getSystemLogs,checkInActivity 
 } from "../controllers/superAdminController.js";
 
 const router = express.Router();
@@ -28,5 +28,5 @@ router.get("/activities",  authenticateUser, authorizeRoles("super_admin","admin
 // Quản lý Điểm danh & Logs
 router.get("/attendance", authenticateUser, authorizeRoles("super_admin","admin"), getAttendanceRecords);
 router.get("/logs", authenticateUser, authorizeRoles("super_admin","admin"), getSystemLogs);
-
+router.post("/check-in",authenticateUser, authorizeRoles("super_admin","admin"), checkInActivity);
 export default router;

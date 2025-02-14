@@ -237,6 +237,67 @@ export const getAttendanceRecords = async (req, res) => {
         res.status(500).json({ message: "Lỗi lấy danh sách điểm danh", error });
     }
 };
+export const checkInActivity = async (req, res) => {
+    try {
+        const { studentId, activityId } = req.body;
+        const adminId = req.user ? req.user.id : null; // Lấy ID người thực hiện
+
+        // Kiểm tra dữ liệu đầu vào
+        if (!studentId || !activityId) {
+            return res.status(400).json({ message: "Thiếu thông tin điểm danh!" });
+        }
+
+        // Kiểm tra sinh viên có tồn tại không
+        const student = await User.findById(studentId);
+        if (!student) {
+            return res.status(404).json({ message: "Sinh viên không tồn tại!" });
+        }
+
+        // Kiểm tra hoạt động có tồn tại không
+        const activity = await Activity.findById(activityId);
+        if (!activity) {
+            return res.status(404).json({ message: "Hoạt động không tồn tại!" });
+        }
+
+        // Kiểm tra sinh viên đã điểm danh chưa
+        const existingRecord = await AttendanceRecord.findOne({ student_id: studentId, activity_id: activityId });
+        if (existingRecord) {
+            return res.status(400).json({ message: "Sinh viên đã điểm danh hoạt động này!" });
+        }
+
+        // Tạo bản ghi điểm danh
+        const newRecord = await AttendanceRecord.create({
+            student_id: studentId,
+            activity_id: activityId,
+            status: "present",
+            timestamp: new Date(),
+            created_by: adminId, // Lưu admin nào đã điểm danh cho sinh viên
+        });
+
+        // Lưu log điểm danh
+        await Log.create({
+            user_id: adminId, // Lưu người thực hiện
+            action: "Điểm danh sinh viên",
+            description: `Admin ${adminId} đã điểm danh sinh viên ${studentId} vào hoạt động ${activityId}`,
+            timestamp: new Date(),
+        });
+
+        res.status(201).json({ message: "Điểm danh thành công!", record: newRecord });
+    } catch (error) {
+        console.error("❌ Lỗi điểm danh:", error);
+
+        // Lưu log lỗi
+        await Log.create({
+            user_id: req.user ? req.user.id : null,
+            action: "Lỗi",
+            description: `Lỗi khi điểm danh: ${error.message}`,
+            timestamp: new Date(),
+        });
+
+        res.status(500).json({ message: "Lỗi điểm danh", error: error.message });
+    }
+};
+
 
 // ✅ 7️⃣ Xem log hệ thống
 export const getSystemLogs = async (req, res) => {
