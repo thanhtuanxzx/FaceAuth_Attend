@@ -21,54 +21,122 @@ const loadModels = async () => {
 await loadModels();
 
 const trainedDataPath = path.join(__dirname, "../trainedData.json");
+const THRESHOLD = 0.6; // 🔥 Ngưỡng chấp nhận (dưới 0.6 mới tính là cùng một người)
 
-// 🟢 **Hàm train dữ liệu**
+export const trainFaces = async (req, res) => {
+  try {
+    const user_id = req.user.id;
+    if (!user_id) {
+      return res.status(401).json({ message: "❌ Không tìm thấy ID người dùng!" });
+    }
+
+    const user = await User.findById(user_id);
+    if (!user) {
+      return res.status(404).json({ message: "❌ Người dùng không tồn tại!" });
+    }
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ message: "❌ Cần có ảnh để train!" });
+    }
+
+    let trainedFaces = [];
+    try {
+      trainedFaces = JSON.parse(fs.readFileSync(trainedDataPath));
+    } catch (error) {
+      console.log("⚠️ Chưa có dữ liệu train, tạo mới...");
+    }
+
+    let existingUser = trainedFaces.find((person) => person.user_id === user_id);
+    if (!existingUser) {
+      existingUser = { user_id, name: user.name, descriptors: [] };
+      trainedFaces.push(existingUser);
+    }
+
+    let addedCount = 0; // Số ảnh hợp lệ được thêm vào
+    let tempDescriptors = []; // Lưu tạm descriptors để kiểm tra số lượng
+
+    await Promise.all(
+      req.files.map(async (file) => {
+        console.log(`🖼️ Đang xử lý ảnh: ${file.originalname}`);
+
+        const img = await loadImage(file.path);
+        const detection = await faceapi
+          .detectSingleFace(img)
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+
+        fs.unlinkSync(file.path); // 🗑️ Xóa ảnh sau khi train
+
+        if (!detection) {
+          console.log("⚠️ Không tìm thấy khuôn mặt trong ảnh!");
+          return;
+        }
+
+        const newDescriptor = Array.from(detection.descriptor);
+
+        // 📌 So sánh với các khuôn mặt đã có của user
+        if (existingUser.descriptors.length > 0) {
+          const distances = existingUser.descriptors.map((desc) =>
+            faceapi.euclideanDistance(newDescriptor, desc)
+          );
+
+          const minDistance = Math.min(...distances);
+
+          console.log(`🔎 Khoảng cách nhỏ nhất: ${minDistance}`);
+          if (minDistance > THRESHOLD) {
+            console.log("❌ Ảnh này có khuôn mặt khác biệt quá nhiều, bỏ qua.");
+            return;
+          }
+        }
+
+        // ✅ Nếu khuôn mặt khớp, thêm vào danh sách tạm
+        tempDescriptors.push(newDescriptor);
+        addedCount++;
+      })
+    );
+
+    // ❌ Nếu số ảnh hợp lệ < 10, hủy training
+    if (addedCount < 10) {
+      return res.status(400).json({
+        message: `❌ Training thất bại! Cần ít nhất 10 ảnh hợp lệ, nhưng chỉ có ${addedCount}.`,
+      });
+    }
+
+    // 💾 Lưu dữ liệu nếu đủ 10 ảnh
+    existingUser.descriptors.push(...tempDescriptors);
+    fs.writeFileSync(trainedDataPath, JSON.stringify(trainedFaces, null, 2));
+
+    res.json({
+      message: `✅ Training hoàn tất! Đã thêm ${addedCount} ảnh hợp lệ.`,
+      user_id,
+      name: user.name,
+    });
+
+  } catch (error) {
+    console.error("❌ Lỗi training:", error);
+    res.status(500).json({ message: "❌ Lỗi server", error: error.message });
+  }
+};
+
+
 // export const trainFaces = async (req, res) => {
 //   try {
-//     const datasetPath = path.join(__dirname, "../dataset");
-//     const labels = fs.readdirSync(datasetPath);
-
-//     const labeledFaceDescriptors = [];
-
-//     for (const label of labels) {
-//       const imagesPath = path.join(datasetPath, label);
-//       const images = fs.readdirSync(imagesPath);
-
-//       const descriptors = [];
-
-//       for (const image of images) {
-//         const imgPath = path.join(imagesPath, image);
-//         const img = await loadImage(imgPath);
-
-//         const detection = await faceapi
-//           .detectSingleFace(img)
-//           .withFaceLandmarks()
-//           .withFaceDescriptor();
-
-//         if (detection) descriptors.push(Array.from(detection.descriptor)); // 🟢 Chuyển thành mảng số
-//       }
-
-//       if (descriptors.length > 0) {
-//         labeledFaceDescriptors.push({ label, descriptors });
-//       }
+//     // 🔒 Lấy ID user từ token
+//     const user_id = req.user.id;
+//     if (!user_id) {
+//       return res.status(401).json({ message: "❌ Không tìm thấy ID người dùng!" });
 //     }
 
-//     fs.writeFileSync(trainedDataPath, JSON.stringify(labeledFaceDescriptors, null, 2));
-//     res.json({ message: "✅ Training hoàn tất!", data: labeledFaceDescriptors });
-
-//   } catch (error) {
-//     console.error("❌ Lỗi training:", error);
-//     res.status(500).json({ message: "❌ Lỗi server", error });
-//   }
-// };
-
-// export const trainFaces = async (req, res) => {
-//   try {
-//     if (!req.files || req.files.length === 0 || !req.body.label) {
-//       return res.status(400).json({ message: "❌ Cần có ảnh và nhãn (label)!" });
+//     // 🔍 Kiểm tra user có tồn tại không
+//     const user = await User.findById(user_id);
+//     if (!user) {
+//       return res.status(404).json({ message: "❌ Người dùng không tồn tại!" });
 //     }
 
-//     const { label } = req.body; // 🏷️ Lấy nhãn của khuôn mặt
+//     if (!req.files || req.files.length === 0) {
+//       return res.status(400).json({ message: "❌ Cần có ảnh để train!" });
+//     }
+
 //     let trainedFaces = [];
 
 //     // 📂 **Đọc dữ liệu đã train trước đó**
@@ -76,12 +144,12 @@ const trainedDataPath = path.join(__dirname, "../trainedData.json");
 //       trainedFaces = JSON.parse(fs.readFileSync(trainedDataPath));
 //     }
 
-//     // 🔍 **Tìm xem nhãn đã tồn tại chưa**
-//     let existingPerson = trainedFaces.find((person) => person.label === label);
+//     // 🔍 **Tìm user đã có dữ liệu train chưa**
+//     let existingUser = trainedFaces.find((person) => person.user_id === user_id);
 
-//     if (!existingPerson) {
-//       existingPerson = { label, descriptors: [] };
-//       trainedFaces.push(existingPerson);
+//     if (!existingUser) {
+//       existingUser = { user_id, name: user.name, descriptors: [] };
+//       trainedFaces.push(existingUser);
 //     }
 
 //     // 📸 **Duyệt qua từng ảnh và trích xuất đặc trưng**
@@ -96,7 +164,7 @@ const trainedDataPath = path.join(__dirname, "../trainedData.json");
 
 //       if (detection) {
 //         const descriptor = Array.from(detection.descriptor);
-//         existingPerson.descriptors.push(descriptor); // 🔄 Thêm descriptor vào danh sách
+//         existingUser.descriptors.push(descriptor); // 🔄 Thêm descriptor vào danh sách
 //       }
 
 //       fs.unlinkSync(file.path); // 🗑️ Xóa ảnh sau khi train
@@ -105,74 +173,13 @@ const trainedDataPath = path.join(__dirname, "../trainedData.json");
 //     // 💾 **Lưu dữ liệu đã train**
 //     fs.writeFileSync(trainedDataPath, JSON.stringify(trainedFaces, null, 2));
 
-//     res.json({ message: "✅ Training hoàn tất!", label });
+//     res.json({ message: "✅ Training hoàn tất!", user_id, name: user.name });
 
 //   } catch (error) {
 //     console.error("❌ Lỗi training:", error);
 //     res.status(500).json({ message: "❌ Lỗi server", error });
 //   }
 // };
-export const trainFaces = async (req, res) => {
-  try {
-    // 🔒 Lấy ID user từ token
-    const user_id = req.user.id;
-    if (!user_id) {
-      return res.status(401).json({ message: "❌ Không tìm thấy ID người dùng!" });
-    }
-
-    // 🔍 Kiểm tra user có tồn tại không
-    const user = await User.findById(user_id);
-    if (!user) {
-      return res.status(404).json({ message: "❌ Người dùng không tồn tại!" });
-    }
-
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ message: "❌ Cần có ảnh để train!" });
-    }
-
-    let trainedFaces = [];
-
-    // 📂 **Đọc dữ liệu đã train trước đó**
-    if (fs.existsSync(trainedDataPath)) {
-      trainedFaces = JSON.parse(fs.readFileSync(trainedDataPath));
-    }
-
-    // 🔍 **Tìm user đã có dữ liệu train chưa**
-    let existingUser = trainedFaces.find((person) => person.user_id === user_id);
-
-    if (!existingUser) {
-      existingUser = { user_id, name: user.name, descriptors: [] };
-      trainedFaces.push(existingUser);
-    }
-
-    // 📸 **Duyệt qua từng ảnh và trích xuất đặc trưng**
-    for (const file of req.files) {
-      console.log(`🖼️ Đang xử lý ảnh: ${file.originalname}`);
-
-      const img = await loadImage(file.path);
-      const detection = await faceapi
-        .detectSingleFace(img)
-        .withFaceLandmarks()
-        .withFaceDescriptor();
-
-      if (detection) {
-        const descriptor = Array.from(detection.descriptor);
-        existingUser.descriptors.push(descriptor); // 🔄 Thêm descriptor vào danh sách
-      }
-
-      fs.unlinkSync(file.path); // 🗑️ Xóa ảnh sau khi train
-    }
-
-    // 💾 **Lưu dữ liệu đã train**
-    fs.writeFileSync(trainedDataPath, JSON.stringify(trainedFaces, null, 2));
-
-    res.json({ message: "✅ Training hoàn tất!", user_id, name: user.name });
-
-  } catch (error) {
-    console.error("❌ Lỗi training:", error);
-    res.status(500).json({ message: "❌ Lỗi server", error });
-  }
-};
 
 // 🟢 **Hàm nhận diện khuôn mặt**
 // export const verifyFace = async (req, res) => {
@@ -427,7 +434,7 @@ export const verifyFace = async (req, res) => {
     console.log(`🎯 Kết quả nhận diện: ${bestMatch?.user_id || "Không tìm thấy"}`);
     console.log(`📏 Khoảng cách: ${minDistance}`);
 
-    const THRESHOLD = 0.5; // Ngưỡng xác thực khuôn mặt
+    const THRESHOLD = 0.2; // Ngưỡng xác thực khuôn mặt
 
     if (bestMatch && minDistance < THRESHOLD) {
       const recognizedUserId = bestMatch.user_id;

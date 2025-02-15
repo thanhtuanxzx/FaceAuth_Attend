@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import cors from 'cors'; // ✅ Import CORS
 import connectDB from './db/connect.js';
 import authRoutes from './routes/auth.js';
 import faceRoutes from './routes/faceRoutes.js';
@@ -10,6 +11,14 @@ import statisticsRoutes from "./routes/statisticsRoutes.js";
 const app = express();
 
 app.use(express.json());
+
+// 🔥 Cấu hình CORS
+app.use(cors({
+    origin: "*", // ✅ Cho phép tất cả domain truy cập
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true
+}));
 
 // Kết nối MongoDB
 connectDB();
@@ -22,6 +31,8 @@ app.use("/api/students", studentRoutes);
 app.use("/api/statistics", statisticsRoutes);
 
 const PORT = process.env.PORT || 8000;
-app.listen(PORT, () => {
-    console.log(`🚀 Server chạy tại http://localhost:${PORT}`);
+const HOST = "0.0.0.0"; // ✅ Lắng nghe trên tất cả các IP
+
+app.listen(PORT, HOST, () => {
+    console.log(`🚀 Server chạy tại http://${HOST}:${PORT}`);            
 });

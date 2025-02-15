@@ -17,6 +17,7 @@ export const register = async (req, res) => {
         if (role !== "student") {
             return res.status(403).json({ message: "Bạn không thể đăng ký với vai trò này!" });
         }
+        
 
         // Kiểm tra xem email đã tồn tại chưa
         let user = await User.findOne({ email });

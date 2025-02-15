@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đơn Xác Nhận Thành Viên</title>
+    <style>
+        body {
+            font-family: "Times New Roman", serif;
+            margin: 20px auto;
+            width: 80%;
+            max-width: 800px;
+            color: #000;
+        }
+
+        .header {
+            text-align: center;
+            font-weight: bold;
+            text-transform: uppercase;
+            line-height: 1;
+        }
+
+        .underline {
+            display: inline-block;
+            border-bottom: 1px solid #000;
+            width: 120px;
+            margin-left: 10px;
+        }
+
+        .content {
+            text-align: justify;
+            font-size: 18px;
+            line-height: 1.5;
+            margin-top: 10px;
+        }
+
+        .table-container {
+            margin-top: 15px;
+            width: 100%;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: center;
+            font-size: 18px;
+        }
+
+        th, td {
+            border: 1px solid #000;
+            padding: 6px;
+        }
+
+        .right {
+            text-align: right;
+            font-style: italic;
+            margin-top: 30px;
+        }
+
+        .signature {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 40px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .signature div {
+            text-align: center;
+            width: 45%;
+            border-top: 2px solid #000;
+            padding-top: 8px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Phần tiêu đề -->
+    <div class="header">
+        <p>HỘI SINH VIÊN TRƯỜNG ĐẠI HỌC KỸ THUẬT - CÔNG NGHỆ CẦN THƠ</p>
+        <p>CÂU LẠC BỘ NHẬT NGỮ CTUT</p>
+        <p>***</p>
+        <p>ĐƠN XIN XÁC NHẬN THÀNH VIÊN</p>
+        <p>BÁO CÁO THÀNH TÍCH HOẠT ĐỘNG CÁ NHÂN</p>
+    </div>
+
+    <!-- Nội dung chính -->
+    <div class="content">
+        <p><b>Kính gửi:</b> Ban Chủ nhiệm Câu lạc bộ Nhật Ngữ CTUT.</p>
+        <p><b>Họ và tên:</b> {{name}}</p>
+        <p><b>Ngày sinh:</b> <span class="underline"></span></p>
+        <p><b>Hiện tại đang là sinh viên lớp:</b> {{classCode}}</p>
+        <p><b>Khóa:</b> <span class="underline"></span> - <b>MSSV:</b> {{studentId}}</p>
+        <p><b>Ngành học:</b>{{major}}</p>
+        <p><b>Chức vụ trong CLB Nhật Ngữ CTUT:</b> <span class="underline"></span></p>
+
+        <p>Trong quá trình tham gia hoạt động, công tác và học tập trong học kỳ .... năm học ........ tại Câu lạc bộ Nhật Ngữ CTUT, bản thân tôi đã tham gia các hoạt động phong trào đạt được những thành tích hoạt động như sau:</p>
+    </div>
+
+    <!-- Bảng hoạt động -->
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>STT</th>
+                    <th>Tên hoạt động</th>
+                    <th>Ngày</th>
+                    <th>Trạng thái</th>
+                    <th>Ghi chú</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{activities}}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Đoạn kết -->
+    <div class="content">
+        <p>Nay tôi làm đơn này kính mong Ban Chủ Nhiệm Câu Lạc Bộ Nhật Ngữ CTUT xét và xác nhận cho tôi là thành viên của Câu Lạc Bộ Nhật Ngữ CTUT và có tham gia các phong trào, hoạt động của Hội trong học kì …. năm học …………. </p>
+        <p>Tôi xin chân thành cảm ơn!</p>
+    </div>
+
+    <div class="right">
+        <p>Cần Thơ, ngày ... tháng ... năm ......</p>
+    </div>
+
+    <!-- Phần chữ ký -->
+    <div class="signature">
+        <div>NGƯỜI LÀM ĐƠN</div>
+        <div>TM. BAN CHỦ NHIỆM CLB <br> CHỦ NHIỆM</div>
+    </div>
+
+</body>
+</html>

@@ -23,7 +23,7 @@ router.get("/students",authenticateUser, authorizeRoles("super_admin"), getAllSt
 router.post("/activity", authenticateUser, authorizeRoles("super_admin","admin"),createActivity);
 router.delete("/activity/:activityId",  authenticateUser, authorizeRoles("super_admin","admin"),deleteActivity);
 // router.get("/activities",  authenticateUser, authorizeRoles("super_admin","admin"),getAllActivities);
-router.get("/activities",  authenticateUser, authorizeRoles("super_admin","admin"), getAllActivities);
+router.get("/activities",  getAllActivities);
 
 // Quản lý Điểm danh & Logs
 router.get("/attendance", authenticateUser, authorizeRoles("super_admin","admin"), getAttendanceRecords);
