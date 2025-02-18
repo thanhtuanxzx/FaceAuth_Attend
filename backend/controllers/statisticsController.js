@@ -72,7 +72,7 @@ export const exportPDFConfirmation = async (req, res) => {
         res.download(outputPath, `XacNhan_${student.studentId}.pdf`, err => {
             if (err) {
                 console.error("❌ Lỗi tải file:", err.message);
-                return res.status(500).json({ message: "Lỗi tải file", error: err.message });
+                return res.status(500).json({status:500, message: "Lỗi tải file", error: err.message });
             }
             console.log(`📤 File PDF đã gửi: ${outputPath}`);
 
@@ -87,7 +87,7 @@ export const exportPDFConfirmation = async (req, res) => {
 
     } catch (error) {
         console.error("❌ Lỗi xuất file PDF:", error);
-        res.status(500).json({ message: "Lỗi xuất file PDF", error: error.message });
+        res.status(500).json({status:500, message: "Lỗi xuất file PDF", error: error.message });
     }
 };
 // export const exportPDFConfirmation = async (req, res) => {
@@ -223,7 +223,7 @@ export const getOverviewStatistics = async (req, res) => {
         const totalActivities = await Activity.countDocuments();
         const totalCheckIns = await AttendanceRecord.countDocuments();
 
-        res.json({
+        res.json({status:200,
             message: "Thống kê tổng quan hệ thống",
             totalAdmins,
             totalStudents,
@@ -231,7 +231,7 @@ export const getOverviewStatistics = async (req, res) => {
             totalCheckIns
         });
     } catch (error) {
-        res.status(500).json({ message: "Lỗi thống kê tổng quan", error: error.message });
+        res.status(500).json({status:500, message: "Lỗi thống kê tổng quan", error: error.message });
     }
 };
 
@@ -265,7 +265,7 @@ export const getActivityStatistics = async (req, res) => {
             }
         ]);
 
-        return res.status(200).json({
+        return res.status(200).json({status:200,
             success: true,
             message: "Thống kê hoạt động thành công",
             data: activityStats
@@ -273,7 +273,7 @@ export const getActivityStatistics = async (req, res) => {
 
     } catch (error) {
         console.error("Lỗi thống kê hoạt động:", error);
-        return res.status(500).json({
+        return res.status(500).json({status:500,
             success: false,
             message: "Lỗi thống kê hoạt động",
             error: error.message
@@ -306,9 +306,9 @@ export const getStudentStatistics = async (req, res) => {
             }
         ]);
 
-        res.json({ message: "Thống kê sinh viên", studentStats });
+        res.json({ status:200,message: "Thống kê sinh viên", studentStats });
     } catch (error) {
-        res.status(500).json({ message: "Lỗi thống kê sinh viên", error: error.message });
+        res.status(500).json({status:500, message: "Lỗi thống kê sinh viên", error: error.message });
     }
 };
 
@@ -331,7 +331,7 @@ export const getDateStatistics = async (req, res) => {
             startDate = new Date(`${value}T00:00:00.000Z`);
             endDate = new Date(`${value}T23:59:59.999Z`);
         } else {
-            return res.status(400).json({ message: "Loại thống kê không hợp lệ" });
+            return res.status(400).json({ status:400,message: "Loại thống kê không hợp lệ" });
         }
 
         const dateStats = await AttendanceRecord.aggregate([
@@ -339,9 +339,9 @@ export const getDateStatistics = async (req, res) => {
             { $group: { _id: null, totalCheckIns: { $sum: 1 } } }
         ]);
 
-        res.json({ message: `Thống kê theo ${type}`, totalCheckIns: dateStats[0]?.totalCheckIns || 0 });
+        res.json({status:200, message: `Thống kê theo ${type}`, totalCheckIns: dateStats[0]?.totalCheckIns || 0 });
     } catch (error) {
-        res.status(500).json({ message: "Lỗi thống kê theo ngày/tháng/năm", error: error.message });
+        res.status(500).json({ status:500,message: "Lỗi thống kê theo ngày/tháng/năm", error: error.message });
     }
 };
 
@@ -366,7 +366,7 @@ export const exportStatisticsToExcel = async (req, res) => {
             });
 
         if (attendanceRecords.length === 0) {
-            return res.status(404).json({ message: "Không có dữ liệu điểm danh!" });
+            return res.status(404).json({status:404, message: "Không có dữ liệu điểm danh!" });
         }
 
         // Chuyển dữ liệu thành định dạng Excel
@@ -408,7 +408,7 @@ export const exportStatisticsToExcel = async (req, res) => {
         res.download(filePath, "thong_ke.xlsx", err => {
             if (err) {
                 console.error("❌ Lỗi tải file:", err.message);
-                return res.status(500).json({ message: "Lỗi tải file", error: err.message });
+                return res.status(500).json({ status:500,message: "Lỗi tải file", error: err.message });
             }
             console.log("📤 File đã được gửi về client!");
 
@@ -421,7 +421,7 @@ export const exportStatisticsToExcel = async (req, res) => {
 
     } catch (error) {
         console.error("❌ Lỗi xuất thống kê Excel:", error);
-        res.status(500).json({ message: "Lỗi xuất thống kê Excel", error: error.message });
+        res.status(500).json({ status:500,message: "Lỗi xuất thống kê Excel", error: error.message });
     }
 };
 

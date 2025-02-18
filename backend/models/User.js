@@ -9,6 +9,9 @@ const UserSchema = new mongoose.Schema({
     studentId: { type: String, unique: true, sparse: true }, // Mã số sinh viên
     classCode: { type: String }, // Mã lớp
     major: { type: String }, // Ngành học
+    gpa: { type: Number, default: 0 }, // Điểm trung bình tích lũy
+    specialRecognition: { type: String, enum: ["Đảng viên", "Đoàn viên ưu tú", "None"], default: "None" }, // Danh hiệu đặc biệt
+    awards: [{ type: String, enum: ["Nhất", "Nhì", "Ba","other"] }], // Giải thưởng (có thể có nhiều)
     created_at: { type: Date, default: Date.now }
 });
 

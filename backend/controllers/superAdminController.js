@@ -5,6 +5,60 @@ import Log from "../models/Log.js";
 import bcrypt from "bcrypt";
 import mongoose from "mongoose";
 
+export const updateStudentInfo = async (req, res) => {
+    try {
+        // Lấy dữ liệu từ request
+        const { userId, gpa, specialRecognition, awards } = req.body;
+        if (!userId) throw new Error("Thiếu thông tin userId!");
+
+        // Tìm sinh viên
+        const user = await User.findById(userId);
+        if (!user) throw new Error("Sinh viên không tồn tại!");
+
+        let isUpdated = false;
+
+        // Cập nhật GPA
+        if (gpa !== undefined && !isNaN(gpa) && gpa >= 0 && gpa <= 4) {
+            if (user.gpa !== gpa) {
+                user.gpa = gpa;
+                isUpdated = true;
+            }
+        }
+
+        // Cập nhật danh hiệu đặc biệt
+        if (specialRecognition && ["Đảng viên", "Đoàn viên ưu tú", "None"].includes(specialRecognition)) {
+            if (user.specialRecognition !== specialRecognition) {
+                user.specialRecognition = specialRecognition;
+                isUpdated = true;
+            }
+        }
+
+        // Cập nhật giải thưởng (thêm mới nhưng không trùng lặp)
+        if (Array.isArray(awards)) {
+            const validAwards = ["Nhất", "Nhì", "Ba", "other"];
+            const newAwards = awards.filter(award => validAwards.includes(award) && !user.awards.includes(award));
+        
+            if (newAwards.length > 0) {
+                user.awards.push(...newAwards);
+                isUpdated = true;
+            }
+        }
+        
+
+        // Chỉ lưu nếu có thay đổi
+        if (isUpdated) {
+            await user.save();
+            console.log(`✅ Cập nhật thông tin sinh viên ${user.name} thành công!`);
+            res.status(200).json({ message: "Cập nhật thành công!", user });
+        } else {
+            console.log(`⚠️ Không có thay đổi nào đối với sinh viên ${user.name}.`);
+            res.status(200).json({ message: "Không có thay đổi nào." });
+        }
+    } catch (error) {
+        console.error("❌ Lỗi khi cập nhật thông tin sinh viên:", error.message);
+        res.status(400).json({ error: error.message });
+    }
+};
 
 // ✅ 1️⃣ Tạo tài khoản Admin
 export const createAdmin = async (req, res) => {
@@ -19,9 +73,9 @@ export const createAdmin = async (req, res) => {
             role: "admin",
         });
 
-        res.status(201).json({ message: "Admin đã được tạo", admin: newAdmin });
+        res.status(201).json({status:201, message: "Admin đã được tạo", admin: newAdmin });
     } catch (error) {
-        res.status(500).json({ message: "Lỗi tạo Admin", error });
+        res.status(500).json({ status:500,message: "Lỗi tạo Admin", error });
     }
 };
 
@@ -33,7 +87,7 @@ export const deleteAdmin = async (req, res) => {
         // 🔍 Kiểm tra admin có tồn tại không trước khi xóa
         const admin = await User.findById(adminId);
         if (!admin) {
-            return res.status(404).json({ message: "Admin không tồn tại!" });
+            return res.status(404).json({status:404, message: "Admin không tồn tại!" });
         }
 
         // 🗑️ Xóa admin
@@ -47,7 +101,7 @@ export const deleteAdmin = async (req, res) => {
             timestamp: new Date(),
         });
 
-        res.json({ message: `Admin ${admin.name} đã bị xóa` });
+        res.json({status:200, message: `Admin ${admin.name} đã bị xóa` });
     } catch (error) {
         console.error("❌ Lỗi xóa Admin:", error);
 
@@ -59,7 +113,7 @@ export const deleteAdmin = async (req, res) => {
             timestamp: new Date(),
         });
 
-        res.status(500).json({ message: "Lỗi xóa Admin", error: error.message });
+        res.status(500).json({status:500, message: "Lỗi xóa Admin", error: error.message });
     }
 };
 
@@ -67,9 +121,9 @@ export const deleteAdmin = async (req, res) => {
 export const getAllAdmins = async (req, res) => {
     try {
         const admins = await User.find({ role: "admin" });
-        res.json(admins);
+        res.json({status:200,admins});
     } catch (error) {
-        res.status(500).json({ message: "Lỗi lấy danh sách Admin", error });
+        res.status(500).json({status:500, message: "Lỗi lấy danh sách Admin", error });
     }
 };
 
@@ -86,9 +140,9 @@ export const createStudent = async (req, res) => {
             role: "student",
         });
 
-        res.status(201).json({ message: "Sinh viên đã được tạo", student: newStudent });
+        res.status(201).json({ status:200,message: "Sinh viên đã được tạo", student: newStudent });
     } catch (error) {
-        res.status(500).json({ message: "Lỗi tạo sinh viên", error });
+        res.status(500).json({ status:500,message: "Lỗi tạo sinh viên", error });
     }
 };
 
@@ -99,7 +153,7 @@ export const deleteStudent = async (req, res) => {
         // 🔍 Kiểm tra sinh viên có tồn tại không trước khi xóa
         const student = await User.findById(studentId);
         if (!student) {
-            return res.status(404).json({ message: "Sinh viên không tồn tại!" });
+            return res.status(404).json({status:404, message: "Sinh viên không tồn tại!" });
         }
 
         // 🗑️ Xóa sinh viên
@@ -113,7 +167,7 @@ export const deleteStudent = async (req, res) => {
             timestamp: new Date(),
         });
 
-        res.json({ message: `Sinh viên ${student.name} đã bị xóa` });
+        res.json({status:200, message: `Sinh viên ${student.name} đã bị xóa` });
     } catch (error) {
         console.error("❌ Lỗi xóa sinh viên:", error);
 
@@ -125,16 +179,16 @@ export const deleteStudent = async (req, res) => {
             timestamp: new Date(),
         });
 
-        res.status(500).json({ message: "Lỗi xóa sinh viên", error: error.message });
+        res.status(500).json({status:500, message: "Lỗi xóa sinh viên", error: error.message });
     }
 };
 
 export const getAllStudents = async (req, res) => {
     try {
         const students = await User.find({ role: "student" });
-        res.json(students);
+        res.json({status:200,students});
     } catch (error) {
-        res.status(500).json({ message: "Lỗi lấy danh sách sinh viên", error });
+        res.status(500).json({ status:200,message: "Lỗi lấy danh sách sinh viên", error });
     }
 };
 
@@ -167,22 +221,22 @@ export const getAllStudents = async (req, res) => {
 // };
 export const createActivity = async (req, res) => {
     try {
-        const { name, description, date, locations } = req.body;
+        const { name, description, date, locations ,type,level,category} = req.body;
 
         // Kiểm tra quyền tạo hoạt động
         if (!req.user || !req.user.id) {
-            return res.status(403).json({ message: "Bạn không có quyền tạo hoạt động!" });
+            return res.status(403).json({ status:403,message: "Bạn không có quyền tạo hoạt động!" });
         }
 
         // Kiểm tra danh sách địa điểm
         if (!Array.isArray(locations) || locations.length === 0) {
-            return res.status(400).json({ message: "Hoạt động cần có ít nhất một địa điểm!" });
+            return res.status(400).json({status:400, message: "Hoạt động cần có ít nhất một địa điểm!" });
         }
 
         // Kiểm tra từng địa điểm có lat, lon, radius không
         for (const location of locations) {
             if (!location.lat || !location.lon || !location.radius) {
-                return res.status(400).json({ message: "Mỗi địa điểm phải có lat, lon và radius!" });
+                return res.status(400).json({status:400, message: "Mỗi địa điểm phải có lat, lon và radius!" });
             }
         }
 
@@ -196,6 +250,9 @@ export const createActivity = async (req, res) => {
                 lon: loc.lon,
                 radius: loc.radius
             })), // Đảm bảo lưu đúng định dạng
+            type, 
+            level,
+            category,
             created_by: req.user.id,
         });
 
@@ -208,7 +265,7 @@ export const createActivity = async (req, res) => {
         });
 
 
-        res.status(201).json({
+        res.status(201).json({status:201,
             message: "Hoạt động đã được tạo",
             activity: newActivity
         });
@@ -224,7 +281,7 @@ export const createActivity = async (req, res) => {
         });
 
 
-        res.status(500).json({ message: "Lỗi tạo hoạt động", error: error.message });
+        res.status(500).json({status:500, message: "Lỗi tạo hoạt động", error: error.message });
     }
 };
 
@@ -236,13 +293,13 @@ export const deleteActivity = async (req, res) => {
         const activityId = req.params.activityId.trim();
 
         if (!mongoose.Types.ObjectId.isValid(activityId)) {
-            return res.status(400).json({ message: "ID hoạt động không hợp lệ!" });
+            return res.status(400).json({status:400, message: "ID hoạt động không hợp lệ!" });
         }
 
         // 🔍 Tìm hoạt động trước khi xóa
         const activity = await Activity.findById(activityId);
         if (!activity) {
-            return res.status(404).json({ message: "Hoạt động không tồn tại!" });
+            return res.status(404).json({status:404, message: "Hoạt động không tồn tại!" });
         }
 
         // 🗑️ Xóa hoạt động
@@ -256,7 +313,7 @@ export const deleteActivity = async (req, res) => {
             timestamp: new Date(),
         });
 
-        res.json({ message: "Hoạt động đã bị xóa" });
+        res.json({status:200, message: "Hoạt động đã bị xóa" });
     } catch (error) {
         console.error("❌ Lỗi xóa hoạt động:", error);
 
@@ -268,7 +325,7 @@ export const deleteActivity = async (req, res) => {
             timestamp: new Date(),
         });
 
-        res.status(500).json({ message: "Lỗi xóa hoạt động", error: error.message });
+        res.status(500).json({ status:500,message: "Lỗi xóa hoạt động", error: error.message });
     }
 };
 
@@ -278,17 +335,62 @@ export const getAllActivities = async (req, res) => {
         const activities = await Activity.find();
         res.json(activities);
     } catch (error) {
-        res.status(500).json({ message: "Lỗi lấy danh sách hoạt động", error });
+        res.status(500).json({ status:500,message: "Lỗi lấy danh sách hoạt động", error });
     }
 };
+export const toggleLockActivity = async (req, res) => {
+    try {
+        const activityId = req.params.activityId.trim();
+
+        if (!mongoose.Types.ObjectId.isValid(activityId)) {
+            return res.status(400).json({ status:400,message: "ID hoạt động không hợp lệ!" });
+        }
+
+        // 🔍 Tìm hoạt động
+        const activity = await Activity.findById(activityId);
+        if (!activity) {
+            return res.status(404).json({ status:404,message: "Hoạt động không tồn tại!" });
+        }
+
+        // 🔄 Chuyển đổi trạng thái khóa
+        activity.isLocked = !activity.isLocked;
+        await activity.save();
+
+        // ✅ Lưu log thay đổi trạng thái
+        await Log.create({
+            user_id: req.user.id,
+            action: activity.isLocked ? "Khóa hoạt động" : "Mở khóa hoạt động",
+            description: `Người dùng ${req.user.id} đã ${activity.isLocked ? "khóa" : "mở khóa"} hoạt động ${activityId} (${activity.name})`,
+            timestamp: new Date(),
+        });
+
+        res.json({status:200,
+            message: `Hoạt động đã được ${activity.isLocked ? "khóa" : "mở khóa"}`,
+            activity,
+        });
+    } catch (error) {
+        console.error("❌ Lỗi thay đổi trạng thái khóa hoạt động:", error);
+
+        // ❌ Lưu log lỗi
+        await Log.create({
+            user_id: req.user ? req.user.id : null,
+            action: "Lỗi",
+            description: `Lỗi khi thay đổi trạng thái khóa hoạt động: ${error.message}`,
+            timestamp: new Date(),
+        });
+
+        res.status(500).json({status:500, message: "Lỗi thay đổi trạng thái khóa hoạt động", error: error.message });
+    }
+};
+
 
 // ✅ 6️⃣ Lấy danh sách điểm danh của sinh viên
 export const getAttendanceRecords = async (req, res) => {
     try {
         const records = await AttendanceRecord.find().populate("student_id activity_id");
-        res.json(records);
+        res.json({status:200,records});
     } catch (error) {
-        res.status(500).json({ message: "Lỗi lấy danh sách điểm danh", error });
+        res.status(500).json({ status:500,message: "Lỗi lấy danh sách điểm danh", error });
     }
 };
 export const checkInActivity = async (req, res) => {
@@ -298,25 +400,25 @@ export const checkInActivity = async (req, res) => {
 
         // Kiểm tra dữ liệu đầu vào
         if (!studentId || !activityId) {
-            return res.status(400).json({ message: "Thiếu thông tin điểm danh!" });
+            return res.status(400).json({status:400, message: "Thiếu thông tin điểm danh!" });
         }
 
         // Kiểm tra sinh viên có tồn tại không
         const student = await User.findById(studentId);
         if (!student) {
-            return res.status(404).json({ message: "Sinh viên không tồn tại!" });
+            return res.status(404).json({status:404, message: "Sinh viên không tồn tại!" });
         }
 
         // Kiểm tra hoạt động có tồn tại không
         const activity = await Activity.findById(activityId);
         if (!activity) {
-            return res.status(404).json({ message: "Hoạt động không tồn tại!" });
+            return res.status(404).json({status:404, message: "Hoạt động không tồn tại!" });
         }
 
         // Kiểm tra sinh viên đã điểm danh chưa
         const existingRecord = await AttendanceRecord.findOne({ student_id: studentId, activity_id: activityId });
         if (existingRecord) {
-            return res.status(400).json({ message: "Sinh viên đã điểm danh hoạt động này!" });
+            return res.status(400).json({status:400, message: "Sinh viên đã điểm danh hoạt động này!" });
         }
 
         // Tạo bản ghi điểm danh
@@ -336,7 +438,7 @@ export const checkInActivity = async (req, res) => {
             timestamp: new Date(),
         });
 
-        res.status(201).json({ message: "Điểm danh thành công!", record: newRecord });
+        res.status(201).json({ status:201,message: "Điểm danh thành công!", record: newRecord });
     } catch (error) {
         console.error("❌ Lỗi điểm danh:", error);
 
@@ -348,18 +450,46 @@ export const checkInActivity = async (req, res) => {
             timestamp: new Date(),
         });
 
-        res.status(500).json({ message: "Lỗi điểm danh", error: error.message });
+        res.status(500).json({status:500,message: "Lỗi điểm danh", error: error.message });
     }
 };
+
+// export const updateUserAchievements = async (userId, activityId) => {
+//     try {
+//         const activity = await Activity.findById(activityId);
+//         if (!activity) throw new Error("Hoạt động không tồn tại!");
+
+//         const user = await User.findById(userId);
+//         if (!user) throw new Error("Sinh viên không tồn tại!");
+
+//         // Nếu hoạt động có danh hiệu đặc biệt, cập nhật cho User
+//         if (activity.specialRecognition && activity.specialRecognition !== "None") {
+//             user.specialRecognition = activity.specialRecognition;
+//         }
+
+//         // Nếu hoạt động có giải thưởng, thêm vào danh sách của User
+//         if (activity.award && activity.award !== "None" && !user.awards.includes(activity.award)) {
+//             user.awards.push(activity.award);
+//         }
+
+//         await user.save();
+//         console.log(`✅ Cập nhật danh hiệu & giải thưởng cho sinh viên ${user.name} thành công!`);
+//     } catch (error) {
+//         console.error("❌ Lỗi khi cập nhật thành tích sinh viên:", error.message);
+//     }
+// };
+
+
+
 
 
 // ✅ 7️⃣ Xem log hệ thống
 export const getSystemLogs = async (req, res) => {
     try {
         const logs = await Log.find().populate("user_id");
-        res.json(logs);
+        res.json({status:200,logs});
     } catch (error) {
-        res.status(500).json({ message: "Lỗi lấy log hệ thống", error });
+        res.status(500).json({status:500,message: "Lỗi lấy log hệ thống", error });
     }
 };
 

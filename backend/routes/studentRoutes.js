@@ -12,4 +12,6 @@ router.get("/attendance/history", authenticateUser, authorizeRoles("student"), s
 
 // 📌 Xem chi tiết một lần điểm danh
 router.get("/attendance/:id", authenticateUser, authorizeRoles("student"), studentController.getAttendanceById);
+router.get("/profile", authenticateUser,studentController.getUserProfile);
+
 export default router;

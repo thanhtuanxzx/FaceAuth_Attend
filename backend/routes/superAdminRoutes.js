@@ -4,7 +4,8 @@ import {
     createAdmin, deleteAdmin, getAllAdmins,
     createStudent, deleteStudent, getAllStudents,
     createActivity, deleteActivity, getAllActivities,
-    getAttendanceRecords, getSystemLogs,checkInActivity 
+    getAttendanceRecords, getSystemLogs,checkInActivity ,
+    toggleLockActivity,updateStudentInfo
 } from "../controllers/superAdminController.js";
 
 const router = express.Router();
@@ -23,8 +24,10 @@ router.get("/students",authenticateUser, authorizeRoles("super_admin"), getAllSt
 router.post("/activity", authenticateUser, authorizeRoles("super_admin","admin"),createActivity);
 router.delete("/activity/:activityId",  authenticateUser, authorizeRoles("super_admin","admin"),deleteActivity);
 // router.get("/activities",  authenticateUser, authorizeRoles("super_admin","admin"),getAllActivities);
-router.get("/activities",  getAllActivities);
+router.get("/activities", authenticateUser, getAllActivities);
+router.patch("/toggle-lock/:activityId", authenticateUser, authorizeRoles("super_admin","admin"), toggleLockActivity);
 
+router.put("/students/update", updateStudentInfo);
 // Quản lý Điểm danh & Logs
 router.get("/attendance", authenticateUser, authorizeRoles("super_admin","admin"), getAttendanceRecords);
 router.get("/logs", authenticateUser, authorizeRoles("super_admin"), getSystemLogs);

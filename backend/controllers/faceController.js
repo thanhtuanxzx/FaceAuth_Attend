@@ -27,16 +27,16 @@ export const trainFaces = async (req, res) => {
   try {
     const user_id = req.user.id;
     if (!user_id) {
-      return res.status(401).json({ message: "❌ Không tìm thấy ID người dùng!" });
+      return res.status(401).json({status:401, message: "❌ Không tìm thấy ID người dùng!" });
     }
 
     const user = await User.findById(user_id);
     if (!user) {
-      return res.status(404).json({ message: "❌ Người dùng không tồn tại!" });
+      return res.status(404).json({status:404, message: "❌ Người dùng không tồn tại!" });
     }
 
     if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ message: "❌ Cần có ảnh để train!" });
+      return res.status(400).json({ status:400,message: "❌ Cần có ảnh để train!" });
     }
 
     let trainedFaces = [];
@@ -97,7 +97,7 @@ export const trainFaces = async (req, res) => {
 
     // ❌ Nếu số ảnh hợp lệ < 10, hủy training
     if (addedCount < 10) {
-      return res.status(400).json({
+      return res.status(400).json({status:400,
         message: `❌ Training thất bại! Cần ít nhất 10 ảnh hợp lệ, nhưng chỉ có ${addedCount}.`,
       });
     }
@@ -106,7 +106,7 @@ export const trainFaces = async (req, res) => {
     existingUser.descriptors.push(...tempDescriptors);
     fs.writeFileSync(trainedDataPath, JSON.stringify(trainedFaces, null, 2));
 
-    res.json({
+    res.json({status:200,
       message: `✅ Training hoàn tất! Đã thêm ${addedCount} ảnh hợp lệ.`,
       user_id,
       name: user.name,
@@ -114,7 +114,7 @@ export const trainFaces = async (req, res) => {
 
   } catch (error) {
     console.error("❌ Lỗi training:", error);
-    res.status(500).json({ message: "❌ Lỗi server", error: error.message });
+    res.status(500).json({status:500, message: "❌ Lỗi server", error: error.message });
   }
 };
 
@@ -373,7 +373,7 @@ export const trainFaces = async (req, res) => {
 export const verifyFace = async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ message: "❌ Cần tải lên ảnh!" });
+      return res.status(400).json({status:400, message: "❌ Cần tải lên ảnh!" });
     }
 
     console.log(`📸 Ảnh tải lên: ${req.file.path}`);
@@ -381,7 +381,7 @@ export const verifyFace = async (req, res) => {
     // 📌 **Lấy token từ request header**
     const token = req.headers.authorization?.split(" ")[1]; // "Bearer <token>"
     if (!token) {
-      return res.status(401).json({ message: "❌ Chưa đăng nhập!" });
+      return res.status(401).json({status:401, message: "❌ Chưa đăng nhập!" });
     }
 
     // ✅ **Giải mã token**
@@ -389,19 +389,19 @@ export const verifyFace = async (req, res) => {
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET);
     } catch (error) {
-      return res.status(401).json({ message: "❌ Token không hợp lệ!" });
+      return res.status(401).json({status:401, message: "❌ Token không hợp lệ!" });
     }
 
     console.log(`🔑 Token giải mã:`, decoded);
 
     const { activity_id } = req.body;
     if (!activity_id) {
-      return res.status(400).json({ message: "❌ Thiếu activity_id!" });
+      return res.status(400).json({status:400, message: "❌ Thiếu activity_id!" });
     }
 
     // 🔍 **Đọc dữ liệu khuôn mặt đã train**
     if (!fs.existsSync(trainedDataPath)) {
-      return res.status(400).json({ message: "❌ Chưa có dữ liệu khuôn mặt đã train!" });
+      return res.status(400).json({ status:400,message: "❌ Chưa có dữ liệu khuôn mặt đã train!" });
     }
     const trainedFaces = JSON.parse(fs.readFileSync(trainedDataPath, "utf8"));
 
@@ -413,7 +413,7 @@ export const verifyFace = async (req, res) => {
       .withFaceDescriptor();
 
     if (!detection) {
-      return res.status(400).json({ message: "❌ Không tìm thấy khuôn mặt trong ảnh!" });
+      return res.status(400).json({ status:400,message: "❌ Không tìm thấy khuôn mặt trong ảnh!" });
     }
 
     const uploadedDescriptor = detection.descriptor;
@@ -434,7 +434,7 @@ export const verifyFace = async (req, res) => {
     console.log(`🎯 Kết quả nhận diện: ${bestMatch?.user_id || "Không tìm thấy"}`);
     console.log(`📏 Khoảng cách: ${minDistance}`);
 
-    const THRESHOLD = 0.2; // Ngưỡng xác thực khuôn mặt
+    const THRESHOLD = 0.5; // Ngưỡng xác thực khuôn mặt
 
     if (bestMatch && minDistance < THRESHOLD) {
       const recognizedUserId = bestMatch.user_id;
@@ -448,21 +448,21 @@ export const verifyFace = async (req, res) => {
           { expiresIn: "30m" }
         );
 
-        return res.json({
+        return res.json({status:200,
           message: "✅ Xác thực khuôn mặt thành công!",
           user_id: recognizedUserId,
           distance: minDistance,
           token: newToken,
         });
       } else {
-        return res.status(403).json({ message: "❌ User không khớp với token đăng nhập!" });
+        return res.status(403).json({status:403, message: "❌ User không khớp với token đăng nhập!" });
       }
     } else {
-      return res.status(400).json({ message: "❌ Không tìm thấy khuôn mặt khớp!" });
+      return res.status(400).json({status:400, message: "❌ Không tìm thấy khuôn mặt khớp!" });
     }
   } catch (error) {
     console.error("❌ Lỗi nhận diện khuôn mặt:", error);
-    res.status(500).json({ message: "❌ Lỗi server", error: error.message });
+    res.status(500).json({status:500, message: "❌ Lỗi server", error: error.message });
   } finally {
     if (req.file) fs.unlinkSync(req.file.path); // 🗑️ Xóa ảnh sau khi xử lý
   }
