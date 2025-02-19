@@ -15,7 +15,7 @@ const ActivitySchema = new mongoose.Schema({
     // type: String, // Ví dụ: "club", "volunteer", "sport"
     type: { type: String, enum: ["political", "social", "sports", "volunteer", "other"], required: true }, // Loại hoạt động
     level: { type: String, enum: ["school", "city", "national"], default: "school" }, // Cấp tổ chức hoạt động
-    category: String, // Ví dụ: "1b", "3a", "3b", "3c" (dựa trên quy tắc chấm điểm)
+    category: { type: [String], enum: ["1b", "3a", "3b", "3c","5a","5b","5c"], required: true },
     // award: { type: String, enum: ["Nhất", "Nhì", "Ba", "None"], default: "None" }, // Giải thưởng nếu có
     // specialRecognition: { type: String, enum: ["Đảng viên", "Đoàn viên ưu tú", "None"], default: "None" }, // Danh hiệu đặc biệt
     created_by: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // Admin tạo hoạt động

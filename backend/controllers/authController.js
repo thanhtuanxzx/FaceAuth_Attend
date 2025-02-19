@@ -32,11 +32,9 @@ export const register = async (req, res) => {
     }
 
     // Kiểm tra xem email đã tồn tại chưa
-    let user = await User.findOne({ email });
-    if (user)
-      return res
-        .status(400)
-        .json({ status: 400, message: "Email đã tồn tại!" });
+    let user = await User.findOne({ email: email.toLowerCase() });
+    if (user) return res.status(400).json({ status: 400, message: "Email đã tồn tại!" });
+
 
     // Kiểm tra xem mã số sinh viên đã tồn tại chưa
     let existingStudent = await User.findOne({ studentId });
@@ -51,7 +49,7 @@ export const register = async (req, res) => {
     // Tạo user mới nhưng chưa xác thực
     user = new User({
       name,
-      email,
+      email: email.toLowerCase(), 
       password: hashedPassword,
       studentId,
       classCode,
@@ -67,7 +65,8 @@ export const register = async (req, res) => {
     });
 
     // Gửi email xác thực
-    const verifyLink = `http://localhost:${process.env.PORT}/api/auth/verify/${token}`;
+    // const verifyLink = `http://localhost:${process.env.PORT}/api/auth/verify/${token}`;
+    const verifyLink = `https://timely-sfogliatella-c686a4.netlify.app/XacThuc/${token}`;
     await sendEmail(
       email,
       "Xác thực tài khoản",
@@ -216,7 +215,8 @@ export const forgotPassword = async (req, res) => {
       },
     });
 
-    const resetLink = `http://localhost:3000/reset-password/${token}`;
+    // const resetLink = `http://localhost:3000/reset-password/${token}`;
+    const resetLink = `https://timely-sfogliatella-c686a4.netlify.app/reset/${token}`;
     const mailOptions = {
       from: process.env.MAIL_FROM_ADDRESS,
       to: email,

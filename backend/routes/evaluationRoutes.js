@@ -33,7 +33,7 @@ router.get("/disciplinary/:userId", async (req, res) => {
 /* 📌 CẬP NHẬT LÝ DO KỶ LUẬT */
 router.put("/disciplinary/:recordId", async (req, res) => {
   try {
-    const updatedRecord = await DisciplinaryRecord.findByIdAndUpdate(
+    const updatedRecord = await DisciplinaryRecord.findByIdAnevaluationdUpdate(
       req.params.recordId,
       { reason: req.body.reason },
       { new: true }
