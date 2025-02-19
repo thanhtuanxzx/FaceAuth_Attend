@@ -6,7 +6,7 @@ import DisciplinaryRecord from "../models/DisciplinaryRecord.js";
 
 // Định nghĩa quy tắc chấm điểm
 const SCORING_RULES = {
-  "1a": { base: 7, absentPenalty: 1, latePenalty: 1 / 3 }, // Nghỉ học không phép trừ 1 điểm, đi muộn mỗi 3 lần trừ 1 điểm
+  "1a": { base: 7, absentPenalty: 1, latePenalty: 1 }, // Nghỉ học không phép trừ 1 điểm, đi muộn mỗi 3 lần trừ 1 điểm
   "1b": { base: 2, perActivity: 1 }, // Mỗi hoạt động CLB, ngoại khóa được +1 điểm (tối đa 2 điểm)
   "1c": { base: 4 }, // Ý thức thi cử
   "1d": { base: 2 }, // Tinh thần vượt khó
@@ -45,17 +45,39 @@ async function updateEvaluationScore(userId, semester) {
   const criteriaScores = {};
 
   // 1. Tính điểm "1a" - Ý thức, thái độ trong học tập
-  const attendanceRecords = await AttendanceRecord.find({ student_id: userId });
+  // const attendanceRecords = await AttendanceRecord.find({ student_id: userId });
+  // let absentCount = 0;
+  // let lateCount = 0;
+  // attendanceRecords.forEach((record) => {
+  //   if (record.status === "absent") absentCount++;
+  //   if (record.status === "late") lateCount++;
+  // });
+  // let studyAwarenessScore = SCORING_RULES["1a"].base;
+  // studyAwarenessScore -= absentCount * SCORING_RULES["1a"].absentPenalty;
+  // studyAwarenessScore -=
+  //   Math.floor(lateCount / 3) * SCORING_RULES["1a"].latePenalty;
+  // criteriaScores["1a"] = studyAwarenessScore;
+  // totalScore += studyAwarenessScore;
+  // 1. Tính điểm "1a" - Ý thức, thái độ trong học tập
+  const attendanceRecords = await DisciplinaryRecord.find({
+    user_id: userId,
+    reason: /vắng học/i,
+  });
+
   let absentCount = 0;
   let lateCount = 0;
+
   attendanceRecords.forEach((record) => {
-    if (record.status === "absent") absentCount++;
-    if (record.status === "late") lateCount++;
+    if (record.type === "warning") absentCount++;
+    if (record.type === "discipline") lateCount++;
   });
+
   let studyAwarenessScore = SCORING_RULES["1a"].base;
-  studyAwarenessScore -= absentCount * SCORING_RULES["1a"].absentPenalty;
-  studyAwarenessScore -=
-    Math.floor(lateCount / 3) * SCORING_RULES["1a"].latePenalty;
+  studyAwarenessScore -= Math.floor(absentCount /3)* SCORING_RULES["1a"].absentPenalty;
+  studyAwarenessScore -= lateCount * SCORING_RULES["1a"].latePenalty;
+  // studyAwarenessScore -=
+  // Math.floor(lateCount / 3) * SCORING_RULES["1a"].latePenalty;
+
   criteriaScores["1a"] = studyAwarenessScore;
   totalScore += studyAwarenessScore;
 
@@ -76,18 +98,57 @@ async function updateEvaluationScore(userId, semester) {
   totalScore += activity1bScore;
 
   // 3. Tính điểm "1c" - Ý thức thi cử (Dựa trên kỷ luật)
+  // const disciplinaryRecords = await DisciplinaryRecord.find({
+  //   user_id: userId,
+  // });
+  // let examRegulationScore = SCORING_RULES["1c"].base;
+  // disciplinaryRecords.forEach((record) => {
+  //   if (record.type === "warning")
+  //     examRegulationScore -= SCORING_RULES["1c"].penalty;
+  //   if (record.type === "discipline")
+  //     examRegulationScore -= SCORING_RULES["1c"].penalty * 2;
+  // });
+  // criteriaScores["1c"] = examRegulationScore;
+  // totalScore += examRegulationScore;
   const disciplinaryRecords = await DisciplinaryRecord.find({
     user_id: userId,
   });
-  let examRegulationScore = SCORING_RULES["1c"].base;
+
+  // Đảm bảo giá trị luôn là số
+  let examRegulationScore = parseFloat(SCORING_RULES["1c"].base) || 0;
+  const penalty = parseFloat(SCORING_RULES["1c"].penalty) || 0;
+
+  // Kiểm tra dữ liệu đầu vào
+  console.log("SCORING_RULES[1c].base:", SCORING_RULES["1c"].base);
+  console.log("SCORING_RULES[1c].penalty:", SCORING_RULES["1c"].penalty);
+  console.log("examRegulationScore (initial):", examRegulationScore);
+  console.log("penalty:", penalty);
+
+  // Tính điểm dựa trên loại vi phạm
   disciplinaryRecords.forEach((record) => {
-    if (record.type === "warning")
-      examRegulationScore -= SCORING_RULES["1c"].penalty;
-    if (record.type === "discipline")
-      examRegulationScore -= SCORING_RULES["1c"].penalty * 2;
+    if (record.type === "warning") {
+      examRegulationScore -= penalty;
+    }
+    if (record.type === "discipline") {
+      examRegulationScore -= penalty * 2;
+    }
   });
+
+  // Đảm bảo examRegulationScore không bị NaN
+  if (isNaN(examRegulationScore)) {
+    console.error("Lỗi: examRegulationScore không hợp lệ!", {
+      disciplinaryRecords,
+    });
+    examRegulationScore = 0; // Gán giá trị mặc định an toàn
+  }
+
+  // Gán vào tiêu chí và tính tổng điểm
   criteriaScores["1c"] = examRegulationScore;
-  totalScore += examRegulationScore;
+  totalScore = (totalScore || 0) + examRegulationScore;
+
+  // Kiểm tra tổng điểm trước khi lưu vào database
+  console.log("examRegulationScore (final):", examRegulationScore);
+  console.log("totalScore (final):", totalScore);
 
   // 4. Tính điểm "1d" - Tinh thần vượt khó, phấn đấu vươn lên
   const overcomingDifficultyScore = SCORING_RULES["1d"].base; // Tính theo số lượng hoạt động tham gia

@@ -395,50 +395,69 @@ export const getAttendanceRecords = async (req, res) => {
 };
 export const checkInActivity = async (req, res) => {
     try {
-        const { studentId, activityId } = req.body;
+        const { studentIds, activityId } = req.body; // Chấp nhận nhiều studentIds
         const adminId = req.user ? req.user.id : null; // Lấy ID người thực hiện
 
         // Kiểm tra dữ liệu đầu vào
-        if (!studentId || !activityId) {
-            return res.status(400).json({status:400, message: "Thiếu thông tin điểm danh!" });
-        }
-
-        // Kiểm tra sinh viên có tồn tại không
-        const student = await User.findById(studentId);
-        if (!student) {
-            return res.status(404).json({status:404, message: "Sinh viên không tồn tại!" });
+        if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0 || !activityId) {
+            return res.status(400).json({ status: 400, message: "Thiếu thông tin điểm danh hoặc danh sách sinh viên không hợp lệ!" });
         }
 
         // Kiểm tra hoạt động có tồn tại không
         const activity = await Activity.findById(activityId);
         if (!activity) {
-            return res.status(404).json({status:404, message: "Hoạt động không tồn tại!" });
+            return res.status(404).json({ status: 404, message: "Hoạt động không tồn tại!" });
         }
 
-        // Kiểm tra sinh viên đã điểm danh chưa
-        const existingRecord = await AttendanceRecord.findOne({ student_id: studentId, activity_id: activityId });
-        if (existingRecord) {
-            return res.status(400).json({status:400, message: "Sinh viên đã điểm danh hoạt động này!" });
+        // Tìm tất cả sinh viên trong danh sách
+        const students = await User.find({ _id: { $in: studentIds } });
+        if (students.length !== studentIds.length) {
+            return res.status(404).json({ status: 404, message: "Một hoặc nhiều sinh viên không tồn tại!" });
         }
 
-        // Tạo bản ghi điểm danh
-        const newRecord = await AttendanceRecord.create({
-            student_id: studentId,
-            activity_id: activityId,
-            status: "present",
-            timestamp: new Date(),
-            created_by: adminId, // Lưu admin nào đã điểm danh cho sinh viên
-        });
+        const attendanceRecords = [];
+        const logEntries = [];
+        const alreadyCheckedIn = [];
 
-        // Lưu log điểm danh
-        await Log.create({
-            user_id: adminId, // Lưu người thực hiện
-            action: "Điểm danh sinh viên",
-            description: `Admin ${adminId} đã điểm danh sinh viên ${studentId} vào hoạt động ${activityId}`,
-            timestamp: new Date(),
-        });
+        for (const studentId of studentIds) {
+            // Kiểm tra sinh viên đã điểm danh chưa
+            const existingRecord = await AttendanceRecord.findOne({ student_id: studentId, activity_id: activityId });
+            if (existingRecord) {
+                alreadyCheckedIn.push(studentId);
+                continue; // Bỏ qua sinh viên đã điểm danh
+            }
 
-        res.status(201).json({ status:201,message: "Điểm danh thành công!", record: newRecord });
+            // Tạo bản ghi điểm danh mới
+            attendanceRecords.push({
+                student_id: studentId,
+                activity_id: activityId,
+                status: "present",
+                timestamp: new Date(),
+                created_by: adminId,
+            });
+
+            // Tạo log điểm danh
+            logEntries.push({
+                user_id: adminId,
+                action: "Điểm danh sinh viên",
+                description: `Admin ${adminId} đã điểm danh sinh viên ${studentId} vào hoạt động ${activityId}`,
+                timestamp: new Date(),
+            });
+        }
+
+        // Lưu tất cả bản ghi điểm danh và log
+        if (attendanceRecords.length > 0) {
+            await AttendanceRecord.insertMany(attendanceRecords);
+            await Log.insertMany(logEntries);
+        }
+
+        // Kết quả phản hồi
+        res.status(201).json({
+            status: 201,
+            message: "Điểm danh thành công!",
+            alreadyCheckedIn,
+            newRecords: attendanceRecords,
+        });
     } catch (error) {
         console.error("❌ Lỗi điểm danh:", error);
 
@@ -450,7 +469,7 @@ export const checkInActivity = async (req, res) => {
             timestamp: new Date(),
         });
 
-        res.status(500).json({status:500,message: "Lỗi điểm danh", error: error.message });
+        res.status(500).json({ status: 500, message: "Lỗi điểm danh", error: error.message });
     }
 };
 
