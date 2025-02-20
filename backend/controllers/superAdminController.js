@@ -397,6 +397,7 @@ export const checkInActivity = async (req, res) => {
     try {
         const { studentIds, activityId } = req.body; // Chấp nhận nhiều studentIds
         const adminId = req.user ? req.user.id : null; // Lấy ID người thực hiện
+        const adminRole = req.user ? req.user.role : null; // Lấy quyền của người thực hiện
 
         // Kiểm tra dữ liệu đầu vào
         if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0 || !activityId) {
@@ -408,6 +409,18 @@ export const checkInActivity = async (req, res) => {
         if (!activity) {
             return res.status(404).json({ status: 404, message: "Hoạt động không tồn tại!" });
         }
+
+        // ⚠️ Kiểm tra quyền nếu activity thuộc category "5b" hoặc "5c"
+        if (activity.category.includes("5b") || activity.category.includes("5c")) {
+            if (adminRole !== "super_admin") {
+                console.warn("🚫 Quyền hạn không đủ để điểm danh cho hoạt động thuộc danh mục 5b và 5c!");
+                return res.status(403).json({ 
+                    status: 403, 
+                    message: "Chỉ super_admin mới được điểm danh cho hoạt động thuộc danh mục 5b và 5c!" 
+                });
+            }
+        }
+        
 
         // Tìm tất cả sinh viên trong danh sách
         const students = await User.find({ _id: { $in: studentIds } });
@@ -472,6 +485,7 @@ export const checkInActivity = async (req, res) => {
         res.status(500).json({ status: 500, message: "Lỗi điểm danh", error: error.message });
     }
 };
+
 
 // export const updateUserAchievements = async (userId, activityId) => {
 //     try {
