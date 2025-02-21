@@ -18,6 +18,7 @@ const ActivitySchema = new mongoose.Schema({
     category: { type: [String], enum: ["1b", "3a", "3b", "3c","5a","5b","5c"], required: true },
     // award: { type: String, enum: ["Nhất", "Nhì", "Ba", "None"], default: "None" }, // Giải thưởng nếu có
     // specialRecognition: { type: String, enum: ["Đảng viên", "Đoàn viên ưu tú", "None"], default: "None" }, // Danh hiệu đặc biệt
+    group: { type: mongoose.Schema.Types.ObjectId, ref: "GroupAdmin" },
     created_by: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // Admin tạo hoạt động
     created_at: { type: Date, default: Date.now }
 });

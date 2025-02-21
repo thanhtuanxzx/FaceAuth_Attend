@@ -9,7 +9,7 @@ import studentRoutes from "./routes/studentRoutes.js";
 import statisticsRoutes from "./routes/statisticsRoutes.js";
 import transactionRoutes from './routes/transactionRoutes.js';
 import evaluationRoutes from "./routes/evaluationRoutes.js";
-
+import groupAdminRoutes from './routes/groupAdminRoutes.js';
 const app = express();
 
 app.use(express.json());
@@ -33,6 +33,7 @@ app.use("/api/students", studentRoutes);
 app.use("/api/statistics", statisticsRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use("/api/evaluation", evaluationRoutes);
+app.use('/group-admin', groupAdminRoutes);
 
 const PORT = process.env.PORT || 8000;
 const HOST = "0.0.0.0"; // ✅ Lắng nghe trên tất cả các IP

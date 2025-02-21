@@ -4,7 +4,7 @@ import AttendanceRecord from "../models/AttendanceRecord.js";
 import Log from "../models/Log.js";
 import bcrypt from "bcrypt";
 import mongoose from "mongoose";
-
+import GroupAdmin from "../models/GroupAdmin.js";
 export const findUserByStudentId = async (req, res) => {
     try {
         const { studentId } = req.params;
@@ -90,6 +90,7 @@ export const createAdmin = async (req, res) => {
             email,
             password: hashedPassword,
             role: "admin",
+            isVerified:true,
         });
 
         res.status(201).json({status:201, message: "Admin đã được tạo", admin: newAdmin });
@@ -149,7 +150,7 @@ export const getAllAdmins = async (req, res) => {
 // ✅ 4️⃣ Quản lý sinh viên (Tạo, Xóa, Cập nhật)
 export const createStudent = async (req, res) => {
     try {
-        const { name, email, password } = req.body;
+        const { name, email, password,studentId } = req.body;
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const newStudent = await User.create({
@@ -157,6 +158,7 @@ export const createStudent = async (req, res) => {
             email,
             password: hashedPassword,
             role: "student",
+            studentId,
         });
 
         res.status(201).json({ status:200,message: "Sinh viên đã được tạo", student: newStudent });
@@ -240,26 +242,40 @@ export const getAllStudents = async (req, res) => {
 // };
 export const createActivity = async (req, res) => {
     try {
-        const { name, description, date, locations ,type,level,category} = req.body;
+        const { name, description, date, locations, type, level, category, groupId } = req.body;
+        const userId = req.user.id;
+        const userRole = req.user.role;
 
-        // Kiểm tra quyền tạo hoạt động
-        if (!req.user || !req.user.id) {
-            return res.status(403).json({ status:403,message: "Bạn không có quyền tạo hoạt động!" });
+        // Kiểm tra quyền tạo hoạt động (phải có user đăng nhập)
+        if (!userId) {
+            return res.status(403).json({ status: 403, message: "Bạn không có quyền tạo hoạt động!" });
+        }
+
+        // Kiểm tra xem nhóm có tồn tại không
+        const group = await GroupAdmin.findById(groupId);
+        if (!group) {
+            return res.status(404).json({ status: 404, message: "Nhóm không tồn tại!" });
+        }
+
+        // Kiểm tra nếu user có phải là admin trong nhóm hoặc là super_admin
+        const isAdminInGroup = group.members.includes(userId);
+        if (userRole !== "super_admin" && !isAdminInGroup) {
+            return res.status(403).json({ status: 403, message: "Bạn không có quyền tạo hoạt động trong nhóm này!" });
         }
 
         // Kiểm tra danh sách địa điểm
         if (!Array.isArray(locations) || locations.length === 0) {
-            return res.status(400).json({status:400, message: "Hoạt động cần có ít nhất một địa điểm!" });
+            return res.status(400).json({ status: 400, message: "Hoạt động cần có ít nhất một địa điểm!" });
         }
 
         // Kiểm tra từng địa điểm có lat, lon, radius không
         for (const location of locations) {
             if (!location.lat || !location.lon || !location.radius) {
-                return res.status(400).json({status:400, message: "Mỗi địa điểm phải có lat, lon và radius!" });
+                return res.status(400).json({ status: 400, message: "Mỗi địa điểm phải có lat, lon và radius!" });
             }
         }
 
-        // Tạo hoạt động với danh sách địa điểm
+        // 🆕 Tạo hoạt động trong nhóm
         const newActivity = await Activity.create({
             name,
             description,
@@ -269,40 +285,46 @@ export const createActivity = async (req, res) => {
                 lon: loc.lon,
                 radius: loc.radius
             })), // Đảm bảo lưu đúng định dạng
-            type, 
+            type,
             level,
             category,
-            created_by: req.user.id,
+            created_by: userId,
+            group: groupId // Liên kết hoạt động với nhóm
         });
 
-         // ✅ Lưu log tạo hoạt động
-         await Log.create({
-            user_id: req.user.id,
+        // Cập nhật nhóm với hoạt động mới
+        group.activities.push(newActivity._id);
+        await group.save();
+
+        // ✅ Lưu log tạo hoạt động
+        await Log.create({
+            user_id: userId,
             action: "Tạo hoạt động",
-            description: `Người dùng ${req.user.id} đã tạo hoạt động ${newActivity._id} (${name})`,
+            description: `Người dùng ${userId} đã tạo hoạt động ${newActivity._id} (${name}) trong nhóm ${groupId}`,
             timestamp: new Date(),
         });
 
-
-        res.status(201).json({status:201,
-            message: "Hoạt động đã được tạo",
+        res.status(201).json({
+            status: 201,
+            message: "Hoạt động đã được tạo thành công!",
             activity: newActivity
         });
+
     } catch (error) {
         console.error("❌ Lỗi tạo hoạt động:", error);
 
-         // ❌ Lưu log lỗi
-         await Log.create({
+        // ❌ Lưu log lỗi
+        await Log.create({
             user_id: req.user ? req.user.id : null,
             action: "Lỗi",
             description: `Lỗi khi tạo hoạt động: ${error.message}`,
             timestamp: new Date(),
         });
 
-
-        res.status(500).json({status:500, message: "Lỗi tạo hoạt động", error: error.message });
+        res.status(500).json({ status: 500, message: "Lỗi tạo hoạt động", error: error.message });
     }
 };
+
 
 
 
@@ -310,15 +332,26 @@ export const createActivity = async (req, res) => {
 export const deleteActivity = async (req, res) => {
     try {
         const activityId = req.params.activityId.trim();
+        const userId = req.user.id; // ID người yêu cầu xóa
+        const userRole = req.user.role; // Vai trò của người dùng
 
         if (!mongoose.Types.ObjectId.isValid(activityId)) {
-            return res.status(400).json({status:400, message: "ID hoạt động không hợp lệ!" });
+            return res.status(400).json({ status: 400, message: "ID hoạt động không hợp lệ!" });
         }
 
         // 🔍 Tìm hoạt động trước khi xóa
         const activity = await Activity.findById(activityId);
         if (!activity) {
-            return res.status(404).json({status:404, message: "Hoạt động không tồn tại!" });
+            return res.status(404).json({ status: 404, message: "Hoạt động không tồn tại!" });
+        }
+
+        // 🔍 Kiểm tra nếu người dùng thuộc cùng GroupAdmin với người tạo
+        const groupAdmin = await GroupAdmin.findOne({ members: userId });
+        const isSameGroup = groupAdmin && groupAdmin.members.includes(activity.created_by.toString());
+
+        // ⚠️ Kiểm tra quyền xóa (người tạo, super_admin hoặc cùng GroupAdmin)
+        if (activity.created_by.toString() !== userId && userRole !== "super_admin" && !isSameGroup) {
+            return res.status(403).json({ status: 403, message: "Bạn không có quyền xóa hoạt động này!" });
         }
 
         // 🗑️ Xóa hoạt động
@@ -326,13 +359,13 @@ export const deleteActivity = async (req, res) => {
 
         // ✅ Lưu log xóa hoạt động
         await Log.create({
-            user_id: req.user.id,
+            user_id: userId,
             action: "Xóa hoạt động",
-            description: `Người dùng ${req.user.id} đã xóa hoạt động ${activityId} (${activity.name})`,
+            description: `Người dùng ${userId} (${userRole}) đã xóa hoạt động ${activityId} (${activity.name})`,
             timestamp: new Date(),
         });
 
-        res.json({status:200, message: "Hoạt động đã bị xóa" });
+        res.json({ status: 200, message: "Hoạt động đã bị xóa" });
     } catch (error) {
         console.error("❌ Lỗi xóa hoạt động:", error);
 
@@ -344,7 +377,7 @@ export const deleteActivity = async (req, res) => {
             timestamp: new Date(),
         });
 
-        res.status(500).json({ status:500,message: "Lỗi xóa hoạt động", error: error.message });
+        res.status(500).json({ status: 500, message: "Lỗi xóa hoạt động", error: error.message });
     }
 };
 
@@ -412,98 +445,98 @@ export const getAttendanceRecords = async (req, res) => {
         res.status(500).json({ status:500,message: "Lỗi lấy danh sách điểm danh", error });
     }
 };
-export const checkInActivity = async (req, res) => {
-    try {
-        const { studentIds, activityId } = req.body; // Chấp nhận nhiều studentIds
-        const adminId = req.user ? req.user.id : null; // Lấy ID người thực hiện
-        const adminRole = req.user ? req.user.role : null; // Lấy quyền của người thực hiện
+// export const checkInActivity = async (req, res) => {
+//     try {
+//         const { studentIds, activityId } = req.body; // Chấp nhận nhiều studentIds
+//         const adminId = req.user ? req.user.id : null; // Lấy ID người thực hiện
+//         const adminRole = req.user ? req.user.role : null; // Lấy quyền của người thực hiện
 
-        // Kiểm tra dữ liệu đầu vào
-        if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0 || !activityId) {
-            return res.status(400).json({ status: 400, message: "Thiếu thông tin điểm danh hoặc danh sách sinh viên không hợp lệ!" });
-        }
+//         // Kiểm tra dữ liệu đầu vào
+//         if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0 || !activityId) {
+//             return res.status(400).json({ status: 400, message: "Thiếu thông tin điểm danh hoặc danh sách sinh viên không hợp lệ!" });
+//         }
 
-        // Kiểm tra hoạt động có tồn tại không
-        const activity = await Activity.findById(activityId);
-        if (!activity) {
-            return res.status(404).json({ status: 404, message: "Hoạt động không tồn tại!" });
-        }
+//         // Kiểm tra hoạt động có tồn tại không
+//         const activity = await Activity.findById(activityId);
+//         if (!activity) {
+//             return res.status(404).json({ status: 404, message: "Hoạt động không tồn tại!" });
+//         }
 
-        // ⚠️ Kiểm tra quyền nếu activity thuộc category "5b" hoặc "5c"
-        if (activity.category.includes("5b") || activity.category.includes("5c")) {
-            if (adminRole !== "super_admin") {
-                console.warn("🚫 Quyền hạn không đủ để điểm danh cho hoạt động thuộc danh mục 5b và 5c!");
-                return res.status(403).json({ 
-                    status: 403, 
-                    message: "Chỉ super_admin mới được điểm danh cho hoạt động thuộc danh mục 5b và 5c!" 
-                });
-            }
-        }
+//         // ⚠️ Kiểm tra quyền nếu activity thuộc category "5b" hoặc "5c"
+//         if (activity.category.includes("5b") || activity.category.includes("5c")) {
+//             if (adminRole !== "super_admin") {
+//                 console.warn("🚫 Quyền hạn không đủ để điểm danh cho hoạt động thuộc danh mục 5b và 5c!");
+//                 return res.status(403).json({ 
+//                     status: 403, 
+//                     message: "Chỉ super_admin mới được điểm danh cho hoạt động thuộc danh mục 5b và 5c!" 
+//                 });
+//             }
+//         }
         
 
-        // Tìm tất cả sinh viên trong danh sách
-        const students = await User.find({ _id: { $in: studentIds } });
-        if (students.length !== studentIds.length) {
-            return res.status(404).json({ status: 404, message: "Một hoặc nhiều sinh viên không tồn tại!" });
-        }
+//         // Tìm tất cả sinh viên trong danh sách
+//         const students = await User.find({ _id: { $in: studentIds } });
+//         if (students.length !== studentIds.length) {
+//             return res.status(404).json({ status: 404, message: "Một hoặc nhiều sinh viên không tồn tại!" });
+//         }
 
-        const attendanceRecords = [];
-        const logEntries = [];
-        const alreadyCheckedIn = [];
+//         const attendanceRecords = [];
+//         const logEntries = [];
+//         const alreadyCheckedIn = [];
 
-        for (const studentId of studentIds) {
-            // Kiểm tra sinh viên đã điểm danh chưa
-            const existingRecord = await AttendanceRecord.findOne({ student_id: studentId, activity_id: activityId });
-            if (existingRecord) {
-                alreadyCheckedIn.push(studentId);
-                continue; // Bỏ qua sinh viên đã điểm danh
-            }
+//         for (const studentId of studentIds) {
+//             // Kiểm tra sinh viên đã điểm danh chưa
+//             const existingRecord = await AttendanceRecord.findOne({ student_id: studentId, activity_id: activityId });
+//             if (existingRecord) {
+//                 alreadyCheckedIn.push(studentId);
+//                 continue; // Bỏ qua sinh viên đã điểm danh
+//             }
 
-            // Tạo bản ghi điểm danh mới
-            attendanceRecords.push({
-                student_id: studentId,
-                activity_id: activityId,
-                status: "present",
-                timestamp: new Date(),
-                created_by: adminId,
-            });
+//             // Tạo bản ghi điểm danh mới
+//             attendanceRecords.push({
+//                 student_id: studentId,
+//                 activity_id: activityId,
+//                 status: "present",
+//                 timestamp: new Date(),
+//                 created_by: adminId,
+//             });
 
-            // Tạo log điểm danh
-            logEntries.push({
-                user_id: adminId,
-                action: "Điểm danh sinh viên",
-                description: `Admin ${adminId} đã điểm danh sinh viên ${studentId} vào hoạt động ${activityId}`,
-                timestamp: new Date(),
-            });
-        }
+//             // Tạo log điểm danh
+//             logEntries.push({
+//                 user_id: adminId,
+//                 action: "Điểm danh sinh viên",
+//                 description: `Admin ${adminId} đã điểm danh sinh viên ${studentId} vào hoạt động ${activityId}`,
+//                 timestamp: new Date(),
+//             });
+//         }
 
-        // Lưu tất cả bản ghi điểm danh và log
-        if (attendanceRecords.length > 0) {
-            await AttendanceRecord.insertMany(attendanceRecords);
-            await Log.insertMany(logEntries);
-        }
+//         // Lưu tất cả bản ghi điểm danh và log
+//         if (attendanceRecords.length > 0) {
+//             await AttendanceRecord.insertMany(attendanceRecords);
+//             await Log.insertMany(logEntries);
+//         }
 
-        // Kết quả phản hồi
-        res.status(201).json({
-            status: 201,
-            message: "Điểm danh thành công!",
-            alreadyCheckedIn,
-            newRecords: attendanceRecords,
-        });
-    } catch (error) {
-        console.error("❌ Lỗi điểm danh:", error);
+//         // Kết quả phản hồi
+//         res.status(201).json({
+//             status: 201,
+//             message: "Điểm danh thành công!",
+//             alreadyCheckedIn,
+//             newRecords: attendanceRecords,
+//         });
+//     } catch (error) {
+//         console.error("❌ Lỗi điểm danh:", error);
 
-        // Lưu log lỗi
-        await Log.create({
-            user_id: req.user ? req.user.id : null,
-            action: "Lỗi",
-            description: `Lỗi khi điểm danh: ${error.message}`,
-            timestamp: new Date(),
-        });
+//         // Lưu log lỗi
+//         await Log.create({
+//             user_id: req.user ? req.user.id : null,
+//             action: "Lỗi",
+//             description: `Lỗi khi điểm danh: ${error.message}`,
+//             timestamp: new Date(),
+//         });
 
-        res.status(500).json({ status: 500, message: "Lỗi điểm danh", error: error.message });
-    }
-};
+//         res.status(500).json({ status: 500, message: "Lỗi điểm danh", error: error.message });
+//     }
+// };
 
 
 // export const updateUserAchievements = async (userId, activityId) => {
@@ -545,3 +578,240 @@ export const getSystemLogs = async (req, res) => {
     }
 };
 
+// export const checkInActivity = async (req, res) => {
+//     try {
+//         const { studentIds, activityId } = req.body;
+//         const adminId = req.user ? req.user.id : null;
+//         const adminRole = req.user ? req.user.role : null;
+//         const userId = req.user.id;
+//         const userRole = req.user.role; 
+
+//         if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0 || !activityId) {
+//             return res.status(400).json({ status: 400, message: "Thiếu thông tin điểm danh hoặc danh sách sinh viên không hợp lệ!" });
+//         }
+
+//         const activity = await Activity.findById(activityId);
+//         if (!activity) {
+//             return res.status(404).json({ status: 404, message: "Hoạt động không tồn tại!" });
+//         }
+
+//         // 🔍 Kiểm tra nếu người dùng thuộc cùng GroupAdmin với người tạo hoạt động
+//         const groupAdmin = await GroupAdmin.findOne({ members: userId });
+//         const isSameGroup = groupAdmin && groupAdmin.members.includes(activity.created_by.toString());
+
+//         // ⚠️ Kiểm tra quyền điểm danh (người tạo, super_admin hoặc cùng GroupAdmin)
+//         if (activity.created_by.toString() !== userId && userRole !== "super_admin" && !isSameGroup) {
+//             return res.status(403).json({ status: 403, message: "Bạn không có quyền điểm danh hoạt động này!" });
+//         }
+
+//         if (activity.category.includes("5b") || activity.category.includes("5c")) {
+//             if (adminRole !== "super_admin") {
+//                 return res.status(403).json({
+//                     status: 403,
+//                     message: "Chỉ super_admin mới được điểm danh cho hoạt động thuộc danh mục 5b và 5c!"
+//                 });
+//             }
+//         }
+
+//         const students = await User.find({ studentId: { $in: studentIds } });
+//         const studentMap = new Map(students.map(student => [student.studentId, student]));
+
+//         const attendanceRecords = [];
+//         const logEntries = [];
+//         const alreadyCheckedIn = [];
+//         const invalidStudentIds = [];
+
+//         for (const studentId of studentIds) {
+//             const student = studentMap.get(studentId);
+//             if (!student) {
+//                 invalidStudentIds.push(studentId);
+//                 continue;
+//             }
+
+//             const existingRecord = await AttendanceRecord.findOne({ student_id: student._id, activity_id: activityId });
+//             if (existingRecord) {
+//                 alreadyCheckedIn.push(student.studentId);
+//                 continue;
+//             }
+
+//             attendanceRecords.push({
+//                 student_id: student._id,
+//                 activity_id: activityId,
+//                 status: "present",
+//                 timestamp: new Date(),
+//                 created_by: adminId,
+//             });
+
+//             logEntries.push({
+//                 user_id: adminId,
+//                 action: "Điểm danh sinh viên",
+//                 description: `Admin ${adminId} đã điểm danh sinh viên ${student.studentId} vào hoạt động ${activityId}`,
+//                 timestamp: new Date(),
+//             });
+//         }
+
+//         if (attendanceRecords.length > 0) {
+//             await AttendanceRecord.insertMany(attendanceRecords);
+//             await Log.insertMany(logEntries);
+//         }
+
+//         res.status(201).json({
+//             status: 201,
+//             message: "Điểm danh thành công!",
+//             alreadyCheckedIn,
+//             invalidStudentIds,
+//             newRecords: attendanceRecords.map(record => ({
+//                 studentId: studentMap.get(record.student_id.toString()).studentId,
+//                 activityId: record.activity_id,
+//                 timestamp: record.timestamp
+//             }))
+//         });
+//     } catch (error) {
+//         console.error("❌ Lỗi điểm danh:", error);
+
+//         await Log.create({
+//             user_id: req.user ? req.user.id : null,
+//             action: "Lỗi",
+//             description: `Lỗi khi điểm danh: ${error.message}`,
+//             timestamp: new Date(),
+//         });
+
+//         res.status(500).json({ status: 500, message: "Lỗi điểm danh", error: error.message });
+//     }
+// };
+
+
+export const checkInActivity = async (req, res) => {
+    try {
+        console.log("📥 Nhận request điểm danh:", req.body);
+        console.log("👤 Người thực hiện:", req.user);
+
+        const { studentIds, activityId } = req.body;
+        const adminId = req.user ? req.user.id : null;
+        const adminRole = req.user ? req.user.role : null;
+        const userId = req.user.id;
+        const userRole = req.user.role;
+
+        if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0 || !activityId) {
+            console.log("❌ Thiếu thông tin điểm danh hoặc danh sách sinh viên không hợp lệ!");
+            return res.status(400).json({ status: 400, message: "Thiếu thông tin điểm danh hoặc danh sách sinh viên không hợp lệ!" });
+        }
+
+        const activity = await Activity.findById(activityId);
+        if (!activity) {
+            console.log(`❌ Không tìm thấy hoạt động với ID: ${activityId}`);
+            return res.status(404).json({ status: 404, message: "Hoạt động không tồn tại!" });
+        }
+        console.log("🔍 Hoạt động tìm thấy:", activity);
+
+        // 🔍 Kiểm tra nếu người dùng thuộc cùng GroupAdmin với người tạo hoạt động
+        const groupAdmin = await GroupAdmin.findOne({ members: userId });
+        const isSameGroup = groupAdmin && groupAdmin.members.includes(activity.created_by.toString());
+
+        console.log("🔍 Nhóm quản trị viên tìm thấy:", groupAdmin);
+        console.log("🔍 Kiểm tra cùng nhóm:", isSameGroup);
+
+        // ⚠️ Kiểm tra quyền điểm danh (người tạo, super_admin hoặc cùng GroupAdmin)
+        if (activity.created_by.toString() !== userId && userRole !== "super_admin" && !isSameGroup) {
+            console.log("❌ Người dùng không có quyền điểm danh hoạt động này!");
+            return res.status(403).json({ status: 403, message: "Bạn không có quyền điểm danh hoạt động này!" });
+        }
+
+        if (activity.category.includes("5b") || activity.category.includes("5c")) {
+            if (adminRole !== "super_admin") {
+                console.log("⛔ Chỉ super_admin mới được điểm danh cho hoạt động thuộc danh mục 5b và 5c!");
+                return res.status(403).json({
+                    status: 403,
+                    message: "Chỉ super_admin mới được điểm danh cho hoạt động thuộc danh mục 5b và 5c!"
+                });
+            }
+        }
+
+        // 🔍 Tìm sinh viên theo danh sách ID
+        const students = await User.find({ 
+            _id: { $in: studentIds.map(id => new mongoose.Types.ObjectId(id)) } 
+        });
+        
+
+        
+        
+console.log("🔍 Danh sách sinh viên tìm thấy:", students.map(s => ({
+    id: s._id.toString(),
+    studentId: s.studentId,
+    name: s.name
+})));
+
+
+const studentMap = new Map(students.map(student => [student._id.toString(), student]));
+
+
+        const attendanceRecords = [];
+        const logEntries = [];
+        const alreadyCheckedIn = [];
+        const invalidStudentIds = [];
+
+        for (const studentId of studentIds) {
+            const student = studentMap.get(studentId);
+            if (!student) {
+                console.log(`❌ Không tìm thấy sinh viên có ID: ${studentId}`);
+                invalidStudentIds.push(studentId);
+                continue;
+            }
+
+            const existingRecord = await AttendanceRecord.findOne({ student_id: student._id, activity_id: activityId });
+            if (existingRecord) {
+                console.log(`⚠️ Sinh viên ${student.studentId} đã điểm danh trước đó!`);
+                alreadyCheckedIn.push(student.studentId);
+                continue;
+            }
+
+            attendanceRecords.push({
+                student_id: student._id,
+                activity_id: activityId,
+                status: "present",
+                timestamp: new Date(),
+                created_by: adminId,
+            });
+
+            logEntries.push({
+                user_id: adminId,
+                action: "Điểm danh sinh viên",
+                description: `Admin ${adminId} đã điểm danh sinh viên ${student.studentId} vào hoạt động ${activityId}`,
+                timestamp: new Date(),
+            });
+        }
+
+        console.log("✅ Danh sách điểm danh chuẩn bị lưu:", attendanceRecords);
+        console.log("📜 Log điểm danh chuẩn bị lưu:", logEntries);
+
+        if (attendanceRecords.length > 0) {
+            await AttendanceRecord.insertMany(attendanceRecords);
+            await Log.insertMany(logEntries);
+        }
+
+        console.log("✅ Điểm danh hoàn tất!");
+
+        res.status(201).json({
+            status: 201,
+            message: "Điểm danh thành công!",
+            alreadyCheckedIn,
+            invalidStudentIds,
+            newRecords: attendanceRecords.map(record => ({
+                studentId: studentMap.get(record.student_id.toString()).studentId,
+                activityId: record.activity_id,
+                timestamp: record.timestamp
+            }))
+        });
+    } catch (error) {
+        console.error("❌ Lỗi điểm danh:", error);
+
+        await Log.create({
+            user_id: req.user ? req.user.id : null,
+            action: "Lỗi",
+            description: `Lỗi khi điểm danh: ${error.message}`,
+            timestamp: new Date(),
+        });
+
+        res.status(500).json({ status: 500, message: "Lỗi điểm danh", error: error.message });
+    }
+};
