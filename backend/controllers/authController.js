@@ -5,6 +5,7 @@ import sendEmail from "../utils/sendEmail.js";
 import dotenv from "dotenv";
 import nodemailer from "nodemailer";
 import Log from "../models/Log.js";
+import GroupAdmin from "../models/GroupAdmin.js";
 
 dotenv.config();
 
@@ -123,17 +124,14 @@ export const login = async (req, res) => {
 
     if (!user) {
       await Log.create({
-        user_id: null, // Không có user_id vì email không tồn tại
+        user_id: null,
         action: "Đăng nhập thất bại",
         description: `Đăng nhập thất bại: Email ${email} không tồn tại`,
         timestamp: new Date(),
       });
-      return res
-        .status(400)
-        .json({ status: 400, message: "Email không tồn tại" });
+      return res.status(400).json({ status: 400, message: "Email không tồn tại" });
     }
 
-    // Kiểm tra tài khoản đã xác thực hay chưa
     if (!user.isVerified) {
       await Log.create({
         user_id: user._id,
@@ -141,12 +139,10 @@ export const login = async (req, res) => {
         description: `Người dùng ${user._id} cố gắng đăng nhập nhưng tài khoản chưa xác thực`,
         timestamp: new Date(),
       });
-      return res
-        .status(403)
-        .json({
-          status: 403,
-          message: "Tài khoản chưa được xác thực. Vui lòng kiểm tra email!",
-        });
+      return res.status(403).json({ 
+        status: 403, 
+        message: "Tài khoản chưa được xác thực. Vui lòng kiểm tra email!" 
+      });
     }
 
     const validPassword = await bcrypt.compare(password, user.password);
@@ -157,16 +153,34 @@ export const login = async (req, res) => {
         description: `Người dùng ${user._id} nhập sai mật khẩu`,
         timestamp: new Date(),
       });
-      return res
-        .status(401)
-        .json({ status: 401, message: "Mật khẩu không đúng" });
+      return res.status(401).json({ status: 401, message: "Mật khẩu không đúng" });
     }
 
+    // 🔍 Tìm groupId mà user đang tham gia
+  // 🔍 Tìm tất cả groupId mà user đang tham gia
+let groupIds = [];
+try {
+  const groups = await GroupAdmin.find({ members: user._id }, "_id");
+  if (groups.length > 0) {
+    groupIds = groups.map(group => group._id.toString());
+  }
+} catch (err) {
+  console.error("❌ Lỗi truy vấn groupId:", err);
+}
+
+
+    // ✅ Tạo token với groupId
     const token = jwt.sign(
-      { id: user._id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
+      { 
+        id: user._id.toString(), 
+        email: user.email, 
+        role: user.role, 
+        groupIds: groupIds // ✅ Dùng groupIds thay vì groupId
+      },
+      process.env.JWT_SECRET || "default_secret",
       { expiresIn: "1d" }
     );
+    
 
     // ✅ Lưu log đăng nhập thành công
     await Log.create({
@@ -176,8 +190,10 @@ export const login = async (req, res) => {
       timestamp: new Date(),
     });
 
-    res.json({ status: 200, token, message: "Đăng nhập thành công" });
+    res.json({ status: 200, token }); // ✅ Chỉ trả về status & token
   } catch (error) {
+    console.error("❌ Lỗi đăng nhập:", error);  // Log lỗi ra console
+
     await Log.create({
       user_id: null,
       action: "Lỗi hệ thống",
@@ -185,9 +201,12 @@ export const login = async (req, res) => {
       timestamp: new Date(),
     });
 
-    res.status(500).json({ status: 500, message: "Lỗi đăng nhập", error });
+    res.status(500).json({ status: 500, message: "Lỗi đăng nhập", error: error.message });
   }
 };
+
+
+
 
 export const forgotPassword = async (req, res) => {
   try {

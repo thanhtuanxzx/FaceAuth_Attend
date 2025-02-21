@@ -5,9 +5,9 @@ import { authenticateUser, authorizeRoles } from "../middleware/authMiddleware.j
 const router = express.Router();
 
 router.post('/create', authenticateUser,authorizeRoles("super_admin") ,createGroup);
-router.get('/list', authenticateUser, getGroups);
+router.get('/list', getGroups);
 router.post('/add-member', authenticateUser, addMember);
 router.post('/remove-member', authenticateUser, removeMember);
 router.delete('/delete/:groupId', authenticateUser, deleteGroup);
-router.get("/groups/:groupId/activities", authenticateUser, getActivitiesByGroup);
+router.post("/activities", authenticateUser, getActivitiesByGroup);
 export default router;
