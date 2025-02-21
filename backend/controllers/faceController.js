@@ -5,6 +5,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import jwt from "jsonwebtoken";
 import User from '../models/User.js';
+import Face from "../models/Face.js";  // ✅ Đảm bảo có dòng này
 
 // Cấu hình Canvas cho Node.js
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -465,5 +466,51 @@ export const verifyFace = async (req, res) => {
     res.status(500).json({status:500, message: "❌ Lỗi server", error: error.message });
   } finally {
     if (req.file) fs.unlinkSync(req.file.path); // 🗑️ Xóa ảnh sau khi xử lý
+  }
+};
+// Lưu dữ liệu khuôn mặt
+// Lưu dữ liệu khuôn mặt theo userId từ token
+export const saveFaceData = async (req, res) => {
+  try {
+      const userId = req.user.id;
+      console.log("Received request:", req.body); // 👉 Debug dữ liệu nhận được
+
+      const { faceData } = req.body;
+
+      if (!faceData) {
+          return res.status(400).json({ message: "Missing faceData" });
+      }
+
+      let face = await Face.findOne({ userId });
+
+      if (face) {
+          face.faceData = faceData;
+          await face.save();
+          return res.status(200).json({ message: "Face data updated successfully!" });
+      }
+
+      face = new Face({ userId, faceData });
+      await face.save();
+
+      return res.status(201).json({ message: "Face data saved successfully!" });
+  } catch (error) {
+      return res.status(500).json({ message: "Error saving face data", error: error.message });
+  }
+};
+
+
+// Lấy dữ liệu khuôn mặt dựa vào userId từ token
+export const getFaceData = async (req, res) => {
+  try {
+      const userId = req.user.id; // Lấy userId từ token
+      const face = await Face.findOne({ userId });
+
+      if (!face) {
+          return res.status(404).json({ message: "Face data not found" });
+      }
+
+      return res.status(200).json(face);
+  } catch (error) {
+      return res.status(500).json({ message: "Error retrieving face data", error: error.message });
   }
 };

@@ -5,6 +5,25 @@ import Log from "../models/Log.js";
 import bcrypt from "bcrypt";
 import mongoose from "mongoose";
 
+export const findUserByStudentId = async (req, res) => {
+    try {
+        const { studentId } = req.params;
+        
+        if (!studentId) {
+            return res.status(400).json({ message: "Student ID is required" });
+        }
+
+        const user = await User.findOne({ studentId });
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        return res.status(200).json({status:200,_id:user._id});
+    } catch (error) {
+        return res.status(500).json({ message: "Internal server error", error: error.message });
+    }
+};
 export const updateStudentInfo = async (req, res) => {
     try {
         // Lấy dữ liệu từ request
